@@ -51,6 +51,8 @@ O responder é uma automação operacional; o ecossistema continua com cinco mic
 
 As validações de Helm/Grafana/Collector estão no `README.md` do repositório GitOps da fase 4, disponível localmente em `../togglemaster-gitops`. Execuções GitHub Actions e aceitação em cloud são etapas diferentes e ainda pendentes.
 
+Os workflows remotos foram iniciados, mas erros internos do GitHub impediram sua conclusão integral. O [registro do bootstrap do CI](docs/evidencias/CI_BOOTSTRAP.md) distingue os jobs executados, as correções e as verificações ainda pendentes. Isso não altera o resultado dos testes locais nem libera a gravação.
+
 ## Preparar infraestrutura e CI
 
 Repositórios públicos: [aplicação/IaC/CI](https://github.com/Marcelo6arcia/tech-challenge-fase-4) e [GitOps](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4). A entrega anterior foi preservada.
@@ -73,7 +75,7 @@ export FIAP_ACCOUNT_ID='ID-DA-CONTA-ACADEMICA'
 
 O pipeline Terraform publica apenas resumo de tipos/ações. O plano completo passa entre jobs criptografado com `TF_PLAN_KEY`; apply exige dispatch explícito e revisão no environment `aws-dev`. O bootstrap inicial local é necessário para criar as roles OIDC.
 
-`bootstrap.sh` aplica exatamente o plano salvo, confere sua conta/hash e pede confirmação explícita. `destroy.sh` apenas prepara um plano de encerramento; não apaga recursos. Volumes com policy Retain e o load balancer exigem revisão no encerramento. Não inicializar outro backend nem reutilizar os estados da fase 3 por conveniência.
+`bootstrap.sh` aplica exatamente o plano salvo, confere sua conta/hash e pede confirmação explícita. `destroy.sh` apenas prepara um plano de encerramento; `bootstrap.sh apply-destroy <camada>` aplica o plano `-destroy` revisado mediante confirmação `DESTRUIR <conta>`. Volumes com policy Retain e o load balancer exigem revisão no encerramento. Não inicializar outro backend nem reutilizar os estados da fase 3 por conveniência.
 
 ## Gravação e operação
 

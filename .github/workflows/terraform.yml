@@ -6,11 +6,13 @@ on:
     paths:
       - "terraform/**"
       - ".github/workflows/terraform.yml"
+      - ".github/scripts/**"
   pull_request:
     branches: [main]
     paths:
       - "terraform/**"
       - ".github/workflows/terraform.yml"
+      - ".github/scripts/**"
   workflow_dispatch:
     inputs:
       apply:
@@ -131,6 +133,7 @@ jobs:
       - name: Trivy — misconfiguration no IaC (bloqueia em CRITICAL)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
+          version: v0.76.2
           scan-type: config
           scan-ref: terraform/
           format: table

@@ -1,767 +1,271 @@
 {
-  "scope": "Pr\u00e9via infra fase4; nenhum apply",
-  "resource_changes": [
+  "date": "2026-11-09",
+  "scope": "Infraestrutura fase4; pr\u00e9via, nenhum apply",
+  "github_repository_id": "1451703736",
+  "totals": {
+    "create": 115,
+    "update": 0,
+    "delete": 0
+  },
+  "resources": [
     {
-      "type": "aws_iam_policy_document",
+      "type": "aws_cloudwatch_log_group",
       "actions": [
-        "read"
-      ]
+        "create"
+      ],
+      "count": 3
     },
     {
-      "type": "aws_iam_policy_document",
+      "type": "aws_db_instance",
       "actions": [
-        "read"
-      ]
-    },
-    {
-      "type": "aws_iam_policy_document",
-      "actions": [
-        "read"
-      ]
+        "create"
+      ],
+      "count": 3
     },
     {
       "type": "aws_db_subnet_group",
       "actions": [
         "create"
-      ]
-    },
-    {
-      "type": "aws_eks_addon",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret_version",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret_version",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret_version",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret_version",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "random_id",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "random_password",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "random_password",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "terraform_data",
-      "actions": [
-        "create"
-      ]
+      ],
+      "count": 1
     },
     {
       "type": "aws_dynamodb_table",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 1
     },
     {
       "type": "aws_ecr_lifecycle_policy",
       "actions": [
         "create"
-      ]
-    },
-    {
-      "type": "aws_ecr_lifecycle_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_ecr_lifecycle_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_ecr_lifecycle_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_ecr_lifecycle_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_ecr_lifecycle_policy",
-      "actions": [
-        "create"
-      ]
+      ],
+      "count": 6
     },
     {
       "type": "aws_ecr_repository",
       "actions": [
         "create"
-      ]
-    },
-    {
-      "type": "aws_ecr_repository",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_ecr_repository",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_ecr_repository",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_ecr_repository",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_ecr_repository",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "tls_certificate",
-      "actions": [
-        "read"
-      ]
-    },
-    {
-      "type": "aws_cloudwatch_log_group",
-      "actions": [
-        "create"
-      ]
+      ],
+      "count": 6
     },
     {
       "type": "aws_eks_access_entry",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 1
     },
     {
       "type": "aws_eks_access_policy_association",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 1
     },
     {
       "type": "aws_eks_addon",
       "actions": [
         "create"
-      ]
-    },
-    {
-      "type": "aws_eks_addon",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_eks_addon",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_eks_addon",
-      "actions": [
-        "create"
-      ]
+      ],
+      "count": 5
     },
     {
       "type": "aws_eks_cluster",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 1
     },
     {
       "type": "aws_eks_node_group",
       "actions": [
         "create"
-      ]
-    },
-    {
-      "type": "aws_iam_openid_connect_provider",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_launch_template",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_policy_document",
-      "actions": [
-        "read"
-      ]
-    },
-    {
-      "type": "aws_iam_policy_document",
-      "actions": [
-        "read"
-      ]
-    },
-    {
-      "type": "aws_iam_policy_document",
-      "actions": [
-        "read"
-      ]
-    },
-    {
-      "type": "aws_iam_policy_document",
-      "actions": [
-        "read"
-      ]
-    },
-    {
-      "type": "aws_iam_openid_connect_provider",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_policy_document",
-      "actions": [
-        "read"
-      ]
-    },
-    {
-      "type": "aws_iam_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_policy_document",
-      "actions": [
-        "read"
-      ]
-    },
-    {
-      "type": "aws_iam_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_policy_document",
-      "actions": [
-        "read"
-      ]
-    },
-    {
-      "type": "aws_iam_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_policy_document",
-      "actions": [
-        "read"
-      ]
-    },
-    {
-      "type": "aws_iam_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy_attachment",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_cloudwatch_log_group",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_flow_log",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_iam_role_policy",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_internet_gateway",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_route",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_route_table",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_route_table",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_route_table",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_route_table_association",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_route_table_association",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_route_table_association",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_route_table_association",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_subnet",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_subnet",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_subnet",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_subnet",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_vpc",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_db_instance",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret_version",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_security_group",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_vpc_security_group_egress_rule",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_vpc_security_group_ingress_rule",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "random_password",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_db_instance",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret_version",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_security_group",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_vpc_security_group_egress_rule",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_vpc_security_group_ingress_rule",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "random_password",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_db_instance",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_secretsmanager_secret_version",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_security_group",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_vpc_security_group_egress_rule",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_vpc_security_group_ingress_rule",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "random_password",
-      "actions": [
-        "create"
-      ]
-    },
-    {
-      "type": "aws_cloudwatch_log_group",
-      "actions": [
-        "create"
-      ]
+      ],
+      "count": 1
     },
     {
       "type": "aws_elasticache_cluster",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 1
     },
     {
       "type": "aws_elasticache_subnet_group",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 1
+    },
+    {
+      "type": "aws_flow_log",
+      "actions": [
+        "create"
+      ],
+      "count": 1
+    },
+    {
+      "type": "aws_iam_openid_connect_provider",
+      "actions": [
+        "create"
+      ],
+      "count": 2
+    },
+    {
+      "type": "aws_iam_policy",
+      "actions": [
+        "create"
+      ],
+      "count": 7
+    },
+    {
+      "type": "aws_iam_policy_document",
+      "actions": [
+        "read"
+      ],
+      "count": 11
+    },
+    {
+      "type": "aws_iam_role",
+      "actions": [
+        "create"
+      ],
+      "count": 9
+    },
+    {
+      "type": "aws_iam_role_policy",
+      "actions": [
+        "create"
+      ],
+      "count": 1
+    },
+    {
+      "type": "aws_iam_role_policy_attachment",
+      "actions": [
+        "create"
+      ],
+      "count": 12
+    },
+    {
+      "type": "aws_internet_gateway",
+      "actions": [
+        "create"
+      ],
+      "count": 1
+    },
+    {
+      "type": "aws_launch_template",
+      "actions": [
+        "create"
+      ],
+      "count": 1
+    },
+    {
+      "type": "aws_route",
+      "actions": [
+        "create"
+      ],
+      "count": 1
+    },
+    {
+      "type": "aws_route_table",
+      "actions": [
+        "create"
+      ],
+      "count": 3
+    },
+    {
+      "type": "aws_route_table_association",
+      "actions": [
+        "create"
+      ],
+      "count": 4
+    },
+    {
+      "type": "aws_secretsmanager_secret",
+      "actions": [
+        "create"
+      ],
+      "count": 9
+    },
+    {
+      "type": "aws_secretsmanager_secret_version",
+      "actions": [
+        "create"
+      ],
+      "count": 7
     },
     {
       "type": "aws_security_group",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 4
+    },
+    {
+      "type": "aws_sqs_queue",
+      "actions": [
+        "create"
+      ],
+      "count": 2
+    },
+    {
+      "type": "aws_subnet",
+      "actions": [
+        "create"
+      ],
+      "count": 4
+    },
+    {
+      "type": "aws_vpc",
+      "actions": [
+        "create"
+      ],
+      "count": 1
     },
     {
       "type": "aws_vpc_security_group_egress_rule",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 4
     },
     {
       "type": "aws_vpc_security_group_ingress_rule",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 4
     },
     {
-      "type": "aws_sqs_queue",
+      "type": "random_id",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 1
     },
     {
-      "type": "aws_sqs_queue",
+      "type": "random_password",
       "actions": [
         "create"
-      ]
+      ],
+      "count": 5
+    },
+    {
+      "type": "terraform_data",
+      "actions": [
+        "create"
+      ],
+      "count": 1
+    },
+    {
+      "type": "tls_certificate",
+      "actions": [
+        "read"
+      ],
+      "count": 1
     }
   ]
 }

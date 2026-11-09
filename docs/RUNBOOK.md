@@ -248,3 +248,333 @@ Se a automação falhar, qualquer restart manual é **recuperação operacional 
 Preservar o JSON local e os resultados de testes como validação de desenvolvimento. Para a entrega, capturar dashboard Grafana, trace no APM, notificação ChatOps e execução do Self-Healing; mostrar também Service Map, Firing, incidente e recuperação funcional. Conferir que horários/IDs pertencem ao mesmo ensaio.
 
 Metas: 10/11 infraestrutura/integrações; 11/11 ensaio e correções; 12/11 pacote liberado para Vinicius. A condição de liberação e o roteiro de 23 minutos estão em [HANDOFF_VINICIUS.md](HANDOFF_VINICIUS.md). Não marcar a tarefa pronta antes das provas externas.
+
+## 12. Encerramento da janela autorizada de 72 horas
+
+**Procedimento preparado; não executado.** Na preparação desta seção, a janela
+AWS ainda não começou. Marcelo autorizou a infraestrutura acadêmica por até
+72 horas, incluindo seu encerramento dentro desse limite. Registrar `T0` no
+início do primeiro apply que criar recursos e calcular o limite `T0 + 72h`.
+Começar o encerramento **pelo menos três horas antes do limite**, reservando tempo
+para finalizers, desanexação de discos, exclusão de RDS e rede.
+
+A revisão do plano atual é obrigatória em cada camada. A confirmação
+`DESTRUIR <conta>` do script serve para conferir o alvo; não exige pedir novamente
+uma autorização de encerramento que já foi dada. Uma ampliação da janela ou
+inclusão de recursos de outro projeto não faz parte dessa autorização.
+
+### 12.1. Identidade, evidências e inventário anterior à exclusão
+
+Concluir as capturas e copiar as evidências necessárias para fora dos PVCs antes
+de desmontar a stack. Parar carga/fault, congelar alterações GitOps e impedir
+jobs de provisionamento concorrentes. Conferir no GitHub Actions que não há
+plan/apply/deploy em execução; durante o encerramento, desabilitar o workflow
+Terraform do repositório da fase 4:
+
+```bash
+gh workflow disable terraform.yml --repo Marcelo6arcia/tech-challenge-fase-4
+```
+
+Na raiz `togglemaster/`, em terminal dedicado:
+
+```bash
+export FIAP_APP_DIR="$PWD"
+export FIAP_ACCOUNT_ID='ID-DE-12-DIGITOS-DA-CONTA-FIAP'
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+unset TF_DATA_DIR
+export AWS_PROFILE=fiap AWS_DEFAULT_PROFILE=fiap AWS_REGION=us-east-1 AWS_PAGER=''
+umask 077
+mkdir -p .runs/encerramento
+
+aws --profile fiap sts get-caller-identity
+kubectl --context togglemaster-fase4 config view --minify
+kubectl --context togglemaster-fase4 get nodes
+```
+
+Comparar o Account retornado com `FIAP_ACCOUNT_ID`; conferir que o contexto aponta
+para o ARN EKS dessa conta e autentica pelo profile `fiap`, como na seção 1.
+Interromper se houver divergência. Não usar `--raw` no kubeconfig, nem registrar
+Secrets ou o conteúdo dos states. Conferir os backends exclusivos
+`togglemaster/fase4/infra.tfstate` e `togglemaster/fase4/platform.tfstate`.
+
+Guardar nomes/IDs anteriores à limpeza, para não depender de objetos já apagados:
+
+```bash
+terraform -chdir=terraform/envs/dev/infra state list > .runs/encerramento/infra-state-addresses.txt
+terraform -chdir=terraform/envs/dev/platform state list > .runs/encerramento/platform-state-addresses.txt
+terraform -chdir=terraform/envs/dev/infra output -raw vpc_id > .runs/encerramento/vpc-id.txt
+terraform -chdir=terraform/envs/dev/infra output -raw eks_cluster_name > .runs/encerramento/cluster-name.txt
+
+kubectl --context togglemaster-fase4 -n argocd get applications,applicationsets -o json \
+  > .runs/encerramento/argocd-before.json
+kubectl --context togglemaster-fase4 -n observability get pvc -o json \
+  > .runs/encerramento/pvc-before.json
+kubectl --context togglemaster-fase4 get pv \
+  -o custom-columns='PV:metadata.name,NAMESPACE:spec.claimRef.namespace,PVC:spec.claimRef.name,CLAIM_UID:spec.claimRef.uid,CLASS:spec.storageClassName,RECLAIM:spec.persistentVolumeReclaimPolicy,DRIVER:spec.csi.driver,VOLUME:spec.csi.volumeHandle' \
+  > .runs/encerramento/pv-map-before.txt
+kubectl --context togglemaster-fase4 -n ingress-nginx get svc ingress-nginx-controller -o json \
+  > .runs/encerramento/ingress-service-before.json
+```
+
+Montar uma lista revisada **somente** dos PVCs de `observability` com StorageClass
+`gp3-observability`, associando nome/UID do claim, PV e `spec.csi.volumeHandle`.
+Os valores atuais pedem Prometheus 10Gi, Loki 10Gi, Grafana 2Gi e responder 1Gi;
+confirmar o inventário real, sem deduzir nomes ou IDs apenas pelo tamanho.
+Registrar também IDs/ARNs dos recursos AWS da fase 4 presentes no plano/state:
+EKS/nodes, três RDS, Redis, tabela, filas/DLQ, seis ECR, IAM, Secrets Manager,
+VPC, NAT/EIPs se existirem, logs e discos. `terraform state list` registra
+endereços Terraform, não substitui essa lista de IDs.
+
+Identificar o NLB pelo DNS do Service e conferir VPC/tags de propriedade:
+
+```bash
+FIAP_NLB_DNS="$(kubectl --context togglemaster-fase4 -n ingress-nginx \
+  get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+
+aws --profile fiap --region us-east-1 elbv2 describe-load-balancers \
+  --query "LoadBalancers[?DNSName=='${FIAP_NLB_DNS}'].[LoadBalancerArn,VpcId,DNSName]" \
+  --output json > .runs/encerramento/nlb-before.json
+```
+
+O resultado deve identificar exatamente o NLB desse Service e a VPC registrada.
+Copiar seu ARN para `FIAP_NLB_ARN` e confirmar as tags antes de usá-lo:
+
+```bash
+export FIAP_NLB_ARN='ARN-EXATO-CONFERIDO-NO-INVENTARIO'
+aws --profile fiap --region us-east-1 elbv2 describe-tags \
+  --resource-arns "$FIAP_NLB_ARN" > .runs/encerramento/nlb-tags-before.json
+```
+
+Se o Service não tiver NLB provisionado, registrar essa ausência, conferir que
+não ficou um LB parcial da mesma criação e não executar comandos com ARN vazio.
+
+### 12.2. Parar os reconciliadores que poderiam recriar Applications
+
+A Application raiz se chama **`root`**, criada pelo release Terraform
+`argocd-apps`. Ela recria as Applications e o ApplicationSet
+**`togglemaster-services`**. Remover só as filhas enquanto esses objetos continuam
+reconciliando pode fazer os recursos voltarem.
+
+Primeiro, desabilitar o sync automático da raiz e parar apenas o controlador de
+ApplicationSets. **Manter `argocd-application-controller` ativo**, pois ele precisa
+processar os finalizers das aplicações filhas:
+
+```bash
+kubectl --context togglemaster-fase4 -n argocd patch application root --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":null}}}'
+kubectl --context togglemaster-fase4 -n argocd scale \
+  deployment/argocd-applicationset-controller --replicas=0
+kubectl --context togglemaster-fase4 -n argocd get deployment argocd-applicationset-controller
+kubectl --context togglemaster-fase4 -n argocd get application root \
+  -o jsonpath='{.status.operationState.phase}{"\n"}{.metadata.finalizers}{"\n"}'
+```
+
+Confirmar zero réplicas ativas do controlador de ApplicationSets e nenhuma
+operação da raiz em andamento. Se houver sync ativo, terminar essa operação na
+UI/CLI ArgoCD e aguardar sua parada. No código atual, `root` não declara o
+finalizer de cascata; confirmada essa condição, removê-la preservando as filhas:
+
+```bash
+kubectl --context togglemaster-fase4 -n argocd delete application root \
+  --cascade=orphan --wait=true
+kubectl --context togglemaster-fase4 -n argocd delete applicationset togglemaster-services \
+  --cascade=orphan --wait=true
+```
+
+Se `root` tiver recebido o finalizer de cascata em runtime, usar a operação
+**não cascata** do ArgoCD, `argocd app delete root --cascade=false`, na sessão
+acadêmica já autenticada. `--cascade=orphan` do kubectl sozinho não neutraliza um
+finalizer ArgoCD. Essa exceção é exclusiva da raiz: **não remover os finalizers
+das filhas**, que são necessários para limpar seus recursos.
+
+Conferir que `root` e o ApplicationSet desapareceram, as filhas continuam
+presentes e não são recriadas por outra automação. Não executar Terraform apply
+normal nem reativar o workflow durante o encerramento; usar somente os planos
+de destruição das etapas abaixo.
+
+### 12.3. Excluir as Applications filhas mantendo ArgoCD/CSI disponíveis
+
+As cinco Applications de negócio e as sete Applications de observabilidade,
+além de `platform`, declaram `resources-finalizer.argocd.argoproj.io`. Excluí-las
+com seus finalizers permite que o ArgoCD remova os recursos gerenciados. A
+foundation fica por último porque contém Namespace e StorageClass.
+
+```bash
+kubectl --context togglemaster-fase4 -n argocd delete application \
+  auth-service flag-service targeting-service evaluation-service analytics-service \
+  platform grafana incident-responder prometheus loki otel-agent otel-gateway \
+  --wait=false
+
+kubectl --context togglemaster-fase4 -n argocd wait --for=delete \
+  application/auth-service application/flag-service application/targeting-service \
+  application/evaluation-service application/analytics-service application/platform \
+  application/grafana application/incident-responder application/prometheus \
+  application/loki application/otel-agent application/otel-gateway --timeout=900s
+```
+
+Confirmar ausência dos workloads desses aplicativos. Se uma Application ficar
+em `Terminating`, investigar seus recursos/finalizers e permissões enquanto o
+cluster e o ArgoCD ainda existem. Não limpar finalizers à força para aparentar
+sucesso e não apagar o cluster antes de resolver a limpeza.
+
+A Application **`platform`** do ArgoCD remove Ingress/ExternalSecrets/bootstrap
+da aplicação. Ela **não é** a camada Terraform `platform`, nem é dona do Service
+`ingress-nginx-controller`. Esse Service é instalado pelo release Helm do
+Terraform; ele e seu NLB serão removidos explicitamente na etapa 12.5, antes
+da destruição geral da plataforma.
+
+### 12.4. Encerrar os volumes `Retain` por IDs conferidos
+
+`gp3-observability` usa `reclaimPolicy: Retain`; remover PVC ou Namespace não
+remove automaticamente o EBS. Loki também configura retenção dos PVCs do
+StatefulSet. Antes de apagar dados, conferir que prints/logs necessários à
+entrega já foram preservados fora desses discos.
+
+Para **cada entrada revisada** do mapeamento da etapa 12.1, preencher os nomes e
+ID exatos; não alimentar estas variáveis com uma busca ampla seguida de delete:
+
+```bash
+export FIAP_PVC='NOME-EXATO-DO-CLAIM-CONFERIDO'
+export FIAP_PV='NOME-EXATO-DO-PV-CONFERIDO'
+export FIAP_VOLUME_ID='vol-ID-EXATO-CONFERIDO'
+
+kubectl --context togglemaster-fase4 get pv "$FIAP_PV" -o json
+aws --profile fiap --region us-east-1 ec2 describe-volumes \
+  --volume-ids "$FIAP_VOLUME_ID" \
+  --query 'Volumes[].{Id:VolumeId,State:State,Attachments:Attachments,Tags:Tags}'
+```
+
+Comparar claim/UID/namespace, driver `ebs.csi.aws.com`, volumeHandle e tags do
+volume com o inventário. A aplicação correspondente deve estar removida e nenhum
+pod pode usar o claim. Se o PVC ainda existir, removê-lo pelo nome registrado;
+aguardar a desanexação pelo CSI, sem usar `--force`:
+
+```bash
+kubectl --context togglemaster-fase4 -n observability delete pvc "$FIAP_PVC" \
+  --ignore-not-found=true --wait=true --timeout=300s
+aws --profile fiap --region us-east-1 ec2 wait volume-available \
+  --volume-ids "$FIAP_VOLUME_ID"
+```
+
+Reconsultar o volume e confirmar `available` com `Attachments=[]`. Só então
+excluir esse EBS identificado e o objeto PV restante:
+
+```bash
+aws --profile fiap --region us-east-1 ec2 delete-volume --volume-id "$FIAP_VOLUME_ID"
+aws --profile fiap --region us-east-1 ec2 wait volume-deleted --volume-ids "$FIAP_VOLUME_ID"
+kubectl --context togglemaster-fase4 delete pv "$FIAP_PV" --ignore-not-found=true
+```
+
+Falha/timeout do waiter exige investigação; não equivale a volume removido.
+Confirmar a resposta de ausência do ID na consulta final. Não excluir volumes
+somente porque estão `available`: podem pertencer a outro projeto. Não criar
+snapshots de retenção automaticamente, pois eles mantêm armazenamento cobrado.
+Registrar o destino de cada um dos quatro volumes efetivamente encontrados.
+
+Depois de concluir os claims/PVs dessa stack, remover a foundation com seu
+finalizer e aguardar a exclusão do Namespace/StorageClass que ela gerencia:
+
+```bash
+kubectl --context togglemaster-fase4 -n argocd delete application observability-foundation --wait=false
+kubectl --context togglemaster-fase4 -n argocd wait --for=delete \
+  application/observability-foundation --timeout=600s
+kubectl --context togglemaster-fase4 -n argocd get applications,applicationsets
+```
+
+A lista esperada é vazia para o projeto. Qualquer Application de outro projeto
+não faz parte da lista de exclusão deste procedimento.
+
+### 12.5. Remover Service/NLB com controladores ativos; depois destruir platform
+
+O Service `ingress-nginx/ingress-nginx-controller` é dono do NLB e pertence ao
+release Helm instalado por Terraform. Removê-lo **antes** do destroy geral da
+plataforma, mantendo EKS, nodes e os controladores responsáveis pelo LB ativos.
+Não depender da ordem de destruição paralela dos releases para a reconciliação
+dos finalizers na AWS.
+
+Esta é uma intervenção específica do encerramento autorizado: a raiz/AppSet já
+foram retirados e o CI está congelado. Helm/Terraform não têm reconciliação
+contínua que recrie esse Service sem uma nova execução. Não fazer apply normal
+entre sua remoção e o destroy; o plano posterior refletirá o estado remanescente.
+
+```bash
+kubectl --context togglemaster-fase4 -n ingress-nginx delete service ingress-nginx-controller --wait=false
+kubectl --context togglemaster-fase4 -n ingress-nginx wait --for=delete \
+  service/ingress-nginx-controller --timeout=900s
+
+aws --profile fiap --region us-east-1 elbv2 wait load-balancers-deleted \
+  --load-balancer-arns "$FIAP_NLB_ARN"
+aws --profile fiap --region us-east-1 elbv2 describe-load-balancers \
+  --load-balancer-arns "$FIAP_NLB_ARN"
+```
+
+Usar somente o **ARN previamente conferido**. A consulta final deve retornar
+`LoadBalancerNotFound`, não AccessDenied ou erro de rede. Se o NLB persistir,
+inspecionar Service/finalizers, eventos e o controlador responsável enquanto
+eles ainda estiverem disponíveis. Resolver o bloqueio antes de destruir a
+plataforma ou EKS/VPC; não retirar finalizers à força. Conferir também target
+groups/ENIs ligados ao NLB inventariado. Não remover recursos homônimos nem
+fazer exclusão de todos os LBs da conta.
+
+Com o NLB comprovadamente ausente e a limpeza dos volumes concluída, gerar um
+plano **novo** de platform. O refresh e a remoção dos releases tratam o Service
+que já não existe; não executar um apply de recriação para corrigir esse drift:
+
+```bash
+scripts/destroy.sh platform
+terraform -chdir=terraform/envs/dev/platform show -no-color \
+  "$FIAP_APP_DIR/.runs/plans/platform-destroy.tfplan"
+scripts/bootstrap.sh apply-destroy platform
+```
+
+O script aplica exatamente esse plano salvo, confere conta/hash e solicita
+`DESTRUIR <conta>`. Não trocar por `terraform destroy -auto-approve`. Conferir que
+o plano elimina somente a plataforma acadêmica da fase 4. A camada infra deve
+continuar ativa até o término bem-sucedido desta etapa.
+
+### 12.6. Destruir infra e registrar o inventário final
+
+Somente depois da plataforma removida, do NLB ausente e dos volumes revisados:
+
+```bash
+scripts/destroy.sh infra
+terraform -chdir=terraform/envs/dev/infra show -no-color \
+  "$FIAP_APP_DIR/.runs/plans/infra-destroy.tfplan"
+scripts/bootstrap.sh apply-destroy infra
+```
+
+Revisar o plano atual, sem reutilizar um plano produzido antes das etapas
+anteriores. Os padrões atuais de laboratório permitem excluir RDS sem snapshot
+final e ECR com imagens; guardar previamente as evidências e referências de
+imagens/commits necessárias à entrega. Não destruir `terraform/bootstrap`, o
+bucket de state compartilhado nem states de fases anteriores.
+
+Ao terminar, registrar horário final e consultar os IDs/ARNs capturados no início:
+
+- Ambos os `terraform state list` da fase 4 devem ficar vazios; guardar a saída.
+- Confirmar ausência de EKS/node groups, instâncias EC2 da stack, três RDS,
+  ElastiCache, tabela DynamoDB, filas/DLQ, seis ECR e recursos IAM/Secrets Manager
+  gerenciados pela fase 4. Registrar estados de exclusão pendente, se houver.
+- Confirmar ausência do NLB, target groups/ENIs associados, quatro EBS
+  inventariados, NAT Gateways/EIPs da stack quando existentes e VPC/subnets.
+- Conferir logs/snapshots/backups e qualquer armazenamento que tenha sido
+  explicitamente preservado; anotar o recurso, motivo e custo residual previsto.
+  O bucket/state já existente permanece como registro, fora da limpeza da stack.
+- Conservar repositórios, vídeo, relatório e evidências. A exclusão da
+  infraestrutura não deve apagar os entregáveis acadêmicos.
+
+Usar consultas por IDs/ARNs e tags da fase 4 somente como conferência, nunca uma
+varredura que apague automaticamente resultados. `AccessDenied`, timeout ou state
+vazio isoladamente não comprovam que a AWS terminou a remoção. Custos podem ter
+atraso de atualização; registrar a evidência de exclusão e posteriormente conferir
+a cobrança, sem declarar custo zero apenas porque o Terraform terminou.
+
+Atualizar `memories.md` e o registro de encerramento com o que efetivamente foi
+removido, pendências e prazo. Se surgir bloqueio, atuar e avisar antes do limite
+já autorizado; não deixar recursos ativos por inércia nem tratar uma extensão
+além das 72 horas como aprovada.
+
+Referências operacionais: [cascata e finalizers do ArgoCD](https://argo-cd.readthedocs.io/en/stable/user-guide/app_deletion/),
+[exclusão de ApplicationSet com órfãos](https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Application-Deletion/),
+[waiter de volume EBS](https://docs.aws.amazon.com/cli/latest/reference/ec2/wait/volume-deleted.html) e
+[waiter de NLB](https://docs.aws.amazon.com/cli/latest/reference/elbv2/wait/load-balancers-deleted.html).
