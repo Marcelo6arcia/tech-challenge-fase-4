@@ -20,8 +20,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
-  security-events: write
 
 env:
   # Precisa acompanhar a versao que escreveu o state. O Terraform LE um state
@@ -61,15 +59,13 @@ jobs:
   # Qualidade e segurança do código de infraestrutura
   # ---------------------------------------------------------------------------
   static-analysis:
+    permissions:
+      contents: read
+      security-events: write
     name: Lint & Security (IaC)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-
-      - name: Conferir janela autorizada
-        env:
-          CLOUD_EXPIRES_AT: ${{ vars.CLOUD_EXPIRES_AT }}
-        run: python3 .github/scripts/cloud_window.py
 
       - uses: hashicorp/setup-terraform@v4
         with:
@@ -133,6 +129,9 @@ jobs:
   # Plan cloud somente na main e após habilitar a infraestrutura
   # ---------------------------------------------------------------------------
   plan:
+    permissions:
+      contents: read
+      id-token: write
     name: Terraform Plan
     runs-on: ubuntu-latest
     needs: static-analysis
@@ -204,6 +203,9 @@ jobs:
   # Apply — dispatch explícito, plano criptografado e aprovação aws-dev
   # ---------------------------------------------------------------------------
   apply:
+    permissions:
+      contents: read
+      id-token: write
     name: Terraform Apply
     runs-on: ubuntu-latest
     needs: plan
@@ -211,6 +213,11 @@ jobs:
     environment: aws-dev
     steps:
       - uses: actions/checkout@v5
+
+      - name: Conferir janela autorizada
+        env:
+          CLOUD_EXPIRES_AT: ${{ vars.CLOUD_EXPIRES_AT }}
+        run: python3 .github/scripts/cloud_window.py
 
       - uses: hashicorp/setup-terraform@v4
         with:
