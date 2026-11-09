@@ -78,6 +78,18 @@ jobs:
       - name: Testar janela e ausência de dados privados no resumo
         run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
 
+      - name: Validar criptografia do artefato com dados sintéticos
+        run: |
+          temp_dir=$(mktemp -d)
+          trap 'rm -rf "$temp_dir"' EXIT
+          test_key=$(head -c 48 /dev/urandom | base64)
+          printf 'plano sintético de teste\n' > "$temp_dir/plain"
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 --output "$temp_dir/cipher" "$temp_dir/plain" <<< "$test_key"
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --output "$temp_dir/restored" --decrypt "$temp_dir/cipher" <<< "$test_key"
+          cmp "$temp_dir/plain" "$temp_dir/restored"
+
       - name: Validar todos os módulos
         run: |
           set -e
