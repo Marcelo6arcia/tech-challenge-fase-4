@@ -24,33 +24,9 @@ permissions:
   contents: read
 
 env:
-  # Precisa acompanhar a versao que escreveu o state. O Terraform LE um state
-  # gravado por versao mais nova, mas se recusa a GRAVA-LO: com o CI em 1.13.3
-  # e o state em 1.15.5, o plan passava e o apply falharia -- e a mensagem so
-  # aparece depois da aprovacao manual, no pior momento possivel.
-  #
-  # Se alguem rodar apply local com uma versao mais nova, o state sobe junto e
-  # esta linha precisa subir tambem. O caminho sem essa armadilha e nao aplicar
-  # da maquina de ninguem, que e a tese da fase.
   TF_VERSION: "1.15.5"
   AWS_REGION: "us-east-1"
   WORKDIR: "terraform/envs/dev/infra"
-  # CIDRs que alcançam o endpoint público da API do EKS. Vem de uma variável de
-  # repositório, e não de um arquivo, porque *.tfvars é gitignored e o valor é
-  # o IP de quem opera — que muda e não deveria ficar num repositório público.
-  # Sem isso, a validação do módulo eks reprova o plan com mensagem explícita,
-  # em vez de o EKS aplicar 0.0.0.0/0 sem avisar.
-  TF_VAR_public_access_cidrs: ${{ secrets.PUBLIC_ACCESS_CIDRS }}
-  # O mesmo bucket que o -backend-config usa, agora tambem como variavel.
-  # terraform.tfvars e gitignored, entao no CI state_bucket_name chegava vazio,
-  # enable_terraform_plan_access virava false e o plano propunha DESTRUIR a
-  # politica que da ao proprio CI permissao de rodar plan. O apply teria
-  # quebrado o pipeline de forma permanente, e o erro seguinte (AccessDenied no
-  # plan) nao apontaria para a causa.
-  TF_VAR_state_bucket_name: ${{ secrets.TF_STATE_BUCKET }}
-  TF_VAR_github_owner: ${{ github.repository_owner }}
-  TF_VAR_github_app_repo: ${{ github.event.repository.name }}
-  TF_VAR_github_repo_id: ${{ github.repository_id }}
 
 concurrency:
   group: terraform-dev
@@ -144,6 +120,12 @@ jobs:
   # Plan cloud somente na main e após habilitar a infraestrutura
   # ---------------------------------------------------------------------------
   plan:
+    env:
+      TF_VAR_public_access_cidrs: ${{ secrets.PUBLIC_ACCESS_CIDRS }}
+      TF_VAR_state_bucket_name: ${{ secrets.TF_STATE_BUCKET }}
+      TF_VAR_github_owner: ${{ github.repository_owner }}
+      TF_VAR_github_app_repo: ${{ github.event.repository.name }}
+      TF_VAR_github_repo_id: ${{ github.repository_id }}
     permissions:
       contents: read
       id-token: write
@@ -218,6 +200,12 @@ jobs:
   # Apply — dispatch explícito, plano criptografado e aprovação aws-dev
   # ---------------------------------------------------------------------------
   apply:
+    env:
+      TF_VAR_public_access_cidrs: ${{ secrets.PUBLIC_ACCESS_CIDRS }}
+      TF_VAR_state_bucket_name: ${{ secrets.TF_STATE_BUCKET }}
+      TF_VAR_github_owner: ${{ github.repository_owner }}
+      TF_VAR_github_app_repo: ${{ github.event.repository.name }}
+      TF_VAR_github_repo_id: ${{ github.repository_id }}
     permissions:
       contents: read
       id-token: write
