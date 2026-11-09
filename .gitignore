@@ -1,0 +1,81 @@
+# =============================================================================
+# Terraform
+# =============================================================================
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+
+# Valores específicos do ambiente
+*.tfvars
+*.tfvars.json
+backend.hcl
+!*.tfvars.example
+!backend.hcl.example
+
+# Configuração de ambiente permanece local na fase 4; exemplos são versionados.
+
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# =============================================================================
+# Segredos e credenciais
+# =============================================================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+!**/key.go
+credentials
+
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+venv/
+.venv/
+.runs/
+
+# =============================================================================
+# Go
+# =============================================================================
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+!coverage.out.example
+
+# =============================================================================
+# Relatórios de segurança gerados localmente
+# =============================================================================
+*.sarif
+bandit-report.json
+sbom-*.json
+checkov.sarif
+
+# =============================================================================
+# IDE e sistema operacional
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

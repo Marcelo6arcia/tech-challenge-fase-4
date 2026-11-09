@@ -1,0 +1,25 @@
+# Versões atualizadas na Fase 3 para eliminar os achados de SCA do Trivy.
+# Antes (Fase 2)          -> CVE relevante
+#   Flask 2.2.2           -> CVE-2023-30861 (vazamento de cookie de sessão via cache)
+#   Werkzeug 2.2.2        -> CVE-2023-25577, CVE-2023-46136, CVE-2024-49766/49767
+#   gunicorn 20.1.0       -> CVE-2024-1135 (request smuggling via Transfer-Encoding)
+#   requests 2.28.1       -> CVE-2023-32681 (vazamento do header Proxy-Authorization)
+Flask==3.0.3
+Werkzeug==3.0.6
+gunicorn==23.0.0
+psycopg2-binary==2.9.10
+python-dotenv==1.0.1
+requests==2.32.3
+
+# Bump exigido pelo SCA: a 5.3.1 carregava a CVE-2020-14343 (CVSS 9.8),
+# execucao arbitraria de codigo via yaml.full_load.
+PyYAML==6.0.2
+
+# Fase 4: SDK/exporters and instrumentation from the same OTel release.
+opentelemetry-api==1.45.1
+opentelemetry-sdk==1.45.1
+opentelemetry-exporter-otlp-proto-http==1.45.1
+opentelemetry-instrumentation-flask==0.66b1
+opentelemetry-instrumentation-logging==0.66b1
+opentelemetry-instrumentation-requests==0.66b1
+opentelemetry-instrumentation-psycopg2==0.66b1

@@ -1,0 +1,168 @@
+name: fiap4
+
+x-telemetry: &telemetry
+  DEPLOYMENT_ENVIRONMENT: local
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_RESOURCE_ATTRIBUTES: service.namespace=togglemaster,deployment.environment.name=local
+  OTEL_METRIC_EXPORT_INTERVAL: "5000"
+  OTEL_BSP_SCHEDULE_DELAY: "1000"
+
+services:
+  postgres-auth:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: authdb
+      POSTGRES_USER: authuser
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:?Execute scripts/local-env.py}
+      SERVICE_API_KEY_HASH: ${SERVICE_API_KEY_HASH:?Execute scripts/local-env.py}
+    volumes:
+      - postgres_auth:/var/lib/postgresql/data
+      - ./auth-service/db/init.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./local/auth-seed.sh:/docker-entrypoint-initdb.d/02_seed.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U authuser -d authdb]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  postgres-flags:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: featuredb
+      POSTGRES_USER: flaguser
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:?Execute scripts/local-env.py}
+    volumes:
+      - postgres_flags:/var/lib/postgresql/data
+      - ./flag-service/db/init.sql:/docker-entrypoint-initdb.d/01_flags.sql:ro
+      - ./targeting-service/db/init.sql:/docker-entrypoint-initdb.d/02_targeting.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U flaguser -d featuredb]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  localstack:
+    build: ./localstack
+    environment:
+      SERVICES: sqs,dynamodb
+      DEFAULT_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
+    healthcheck:
+      test: [CMD-SHELL, "awslocal sqs get-queue-url --queue-name feature-flag-events --region us-east-1 >/dev/null && awslocal dynamodb describe-table --table-name analytics-events --region us-east-1 >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.163.2
+    command: [--config=/etc/otelcol/config.yaml]
+    user: "0:0"
+    volumes:
+      - ./local/collector.yaml:/etc/otelcol/config.yaml:ro
+      - ./.runs/telemetry:/data
+    ports:
+      - 127.0.0.1:18889:8889
+    depends_on: [loki]
+
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.retention.time=2h]
+    volumes:
+      - ./local/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - 127.0.0.1:19090:9090
+
+  loki:
+    image: grafana/loki:3.6.16
+    command: [-config.file=/etc/loki/local.yaml]
+    volumes:
+      - ./local/loki.yaml:/etc/loki/local.yaml:ro
+    ports:
+      - 127.0.0.1:13100:3100
+
+  auth-service:
+    build: ./auth-service
+    environment:
+      <<: *telemetry
+      OTEL_SERVICE_NAME: auth-service
+      DATABASE_URL: postgresql://authuser:${LOCAL_DB_PASSWORD}@postgres-auth:5432/authdb
+      MASTER_KEY: ${MASTER_KEY:?Execute scripts/local-env.py}
+      DEMO_FAULT_ENABLED: "true"
+    ports: [127.0.0.1:18001:8080]
+    depends_on:
+      postgres-auth: {condition: service_healthy}
+      otel-collector: {condition: service_started}
+
+  flag-service:
+    build: ./flag-service
+    environment:
+      <<: *telemetry
+      OTEL_SERVICE_NAME: flag-service
+      DATABASE_URL: postgresql://flaguser:${LOCAL_DB_PASSWORD}@postgres-flags:5432/featuredb
+      AUTH_SERVICE_URL: http://auth-service:8080
+    ports: [127.0.0.1:18002:8080]
+    depends_on:
+      postgres-flags: {condition: service_healthy}
+      auth-service: {condition: service_started}
+
+  targeting-service:
+    build: ./targeting-service
+    environment:
+      <<: *telemetry
+      OTEL_SERVICE_NAME: targeting-service
+      DATABASE_URL: postgresql://flaguser:${LOCAL_DB_PASSWORD}@postgres-flags:5432/featuredb
+      AUTH_SERVICE_URL: http://auth-service:8080
+    ports: [127.0.0.1:18003:8080]
+    depends_on:
+      postgres-flags: {condition: service_healthy}
+      auth-service: {condition: service_started}
+
+  evaluation-service:
+    build: ./evaluation-service
+    environment:
+      <<: *telemetry
+      OTEL_SERVICE_NAME: evaluation-service
+      REDIS_URL: redis://redis:6379
+      FLAG_SERVICE_URL: http://flag-service:8080
+      TARGETING_SERVICE_URL: http://targeting-service:8080
+      SERVICE_API_KEY: ${SERVICE_API_KEY:?Execute scripts/local-env.py}
+      AWS_REGION: us-east-1
+      AWS_SQS_URL: http://localstack:4566/000000000000/feature-flag-events
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    ports: [127.0.0.1:18004:8080]
+    depends_on:
+      redis: {condition: service_healthy}
+      localstack: {condition: service_healthy}
+      flag-service: {condition: service_started}
+      targeting-service: {condition: service_started}
+
+  analytics-service:
+    build: ./analytics-service
+    environment:
+      <<: *telemetry
+      OTEL_SERVICE_NAME: analytics-service
+      AWS_REGION: us-east-1
+      AWS_SQS_URL: http://localstack:4566/000000000000/feature-flag-events
+      AWS_DYNAMODB_TABLE: analytics-events
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    ports: [127.0.0.1:18005:8080]
+    depends_on:
+      localstack: {condition: service_healthy}
+      otel-collector: {condition: service_started}
+
+volumes:
+  postgres_auth:
+  postgres_flags:

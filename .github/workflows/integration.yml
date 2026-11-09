@@ -1,0 +1,46 @@
+name: Integração local e telemetria
+on:
+  push:
+    branches: [main]
+    paths:
+      - "*-service/**"
+      - "incident-responder/**"
+      - "docker-compose.yml"
+      - "local/**"
+      - "localstack/**"
+      - "scripts/local-*.py"
+      - ".github/workflows/integration.yml"
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Gerar valores exclusivos do teste
+        run: python scripts/local-env.py
+      - name: Subir stack isolada
+        run: docker compose -p fiap4 --env-file .env.local up -d --build
+      - name: Provar fluxo funcional e três sinais
+        run: python scripts/local-smoke.py --report .runs/local-smoke.json
+      - name: Testar proteções do runbook
+        run: python -m unittest discover -s incident-responder/tests -v
+      - name: Publicar resultado sintético sem credenciais
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: validacao-local-fase4
+          path: .runs/local-smoke.json
+          # Somente este JSON sanitizado; não enviar o diretório .runs inteiro.
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Encerrar somente a stack deste teste
+        if: always()
+        run: docker compose -p fiap4 --env-file .env.local down --volumes

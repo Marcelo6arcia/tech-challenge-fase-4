@@ -1,0 +1,39 @@
+# Copie para terraform.tfvars e ajuste ao seu ambiente.
+# NENHUMA SENHA aqui: as credenciais dos bancos são geradas pelo Terraform e
+# guardadas no AWS Secrets Manager.
+
+aws_region  = "us-east-1"
+aws_profile = "fiap"
+
+project_name = "togglemaster"
+environment  = "dev"
+
+# Rede — ligue o NAT Gateway se quiser os nós em subnet privada (custa mais)
+enable_nat_gateway = false
+
+# EKS
+# kubernetes_version fica comentado de propósito: sem ele, o Terraform descobre
+# a versão padrão do EKS em tempo de plan. Fixar uma versão que já saiu do
+# suporte padrão faz o apply falhar — o control plane custaria seis vezes mais.
+# kubernetes_version = "1.34"
+node_instance_types = ["t3a.medium"]
+node_min_size       = 2
+node_desired_size   = 3
+node_max_size       = 5
+
+# Acesso administrativo extra ao cluster (opcional)
+# cluster_admin_principal_arns = ["arn:aws:iam::123456789012:user/marcelo"]
+
+# GitHub — usado na condição de trust da federação OIDC
+github_owner    = "Marcelo6arcia"
+github_app_repo = "tech-challenge-fase-4"
+# Preencher com o ID do NOVO repositorio depois de cria-lo; nao reutilizar o ID da fase 3.
+# github_repo_id = "ID_NUMERICO_DO_NOVO_REPOSITORIO"
+
+# Bucket criado por terraform/bootstrap (libera terraform plan no CI)
+state_bucket_name = "togglemaster-tfstate-xxxxxxxx"
+
+# CIDRs que podem alcancar o endpoint publico da API do EKS. Obrigatorio: uma
+# lista vazia faz o EKS aplicar 0.0.0.0/0 silenciosamente, e a validacao do
+# modulo barra isso. Descubra o seu com: curl -s https://checkip.amazonaws.com
+public_access_cidrs = ["203.0.113.10/32"]

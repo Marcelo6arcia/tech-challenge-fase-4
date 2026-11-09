@@ -1,0 +1,21 @@
+line-length = 120
+target-version = "py312"
+
+[lint]
+# "S" (flake8-bandit) fica DE FORA de propósito: o SAST é feito pelo bandit no
+# job dedicado do pipeline, que filtra por severidade (-lll -ii). O ruff aplica
+# a regra de forma binária, então incluir "S" aqui reprovaria o build por
+# achados MEDIUM já triados — por exemplo:
+#   S104 bind em 0.0.0.0: correto dentro de container, e o bloco
+#        `if __name__ == '__main__'` sequer roda em produção (o entrypoint é o gunicorn)
+#   S608 SQL montado por f-string em update_flag(): os fragmentos concatenados são
+#        literais fixos no código; os valores vão por placeholder %s
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = [
+    "E501",  # comprimento de linha já é checado pelo flake8
+    "E701",  # `if conn: conn.rollback()` — estilo do código herdado das fases 1 e 2
+    "B008",  # padrão comum em decoradores do Flask
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["S101"]  # assert é o mecanismo do pytest

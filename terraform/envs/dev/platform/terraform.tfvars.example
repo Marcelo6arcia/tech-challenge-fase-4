@@ -1,0 +1,20 @@
+aws_region  = "us-east-1"
+aws_profile = "fiap"
+
+infra_state_config = {
+  bucket  = "togglemaster-tfstate-xxxxxxxx"
+  key     = "togglemaster/fase4/infra.tfstate"
+  region  = "us-east-1"
+  profile = "fiap"
+}
+
+gitops_repo_url      = "https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4.git"
+gitops_repo_revision = "main"
+gitops_root_path     = "argocd/applications"
+
+# Repositório GitOps público: nada mais a fazer.
+# Se for privado, defina abaixo e exporte TF_VAR_gitops_repo_token.
+# gitops_repo_private  = true
+# gitops_repo_username = "Marcelo6arcia"
+
+argocd_ingress_enabled = false

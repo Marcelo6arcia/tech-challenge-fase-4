@@ -1,0 +1,650 @@
+# =============================================================================
+# WORKFLOW REUTILIZÁVEL — pipeline DevSecOps de um microsserviço
+# =============================================================================
+# Chamado pelos 6 workflows ci-<servico>.yml. Centralizar aqui evita 6 cópias
+# divergentes do mesmo pipeline.
+#
+# Estágios:
+#   1. build-test  — compila e roda testes unitários
+#   2. lint        — análise estática de estilo (golangci-lint / flake8 + ruff)
+#   3. sast        — análise estática de segurança do código (gosec / bandit)
+#   4. sca         — vulnerabilidades em dependências + segredos vazados (Trivy fs)
+#   5. image       — build da imagem, scan do container (Trivy image), push no ECR
+#   6. gitops      — atualiza a tag da imagem no repositório GitOps
+#
+# REGRA DE BLOQUEIO: qualquer achado CRITICAL em SCA, SAST ou no scan da imagem
+# derruba o pipeline e impede o push da imagem — logo, impede o deploy.
+# =============================================================================
+
+name: reusable-ci
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: "Nome do microsserviço (também é o nome do diretório e do repositório ECR)"
+        required: true
+        type: string
+      language:
+        description: "go ou python"
+        required: true
+        type: string
+      go_version:
+        required: false
+        type: string
+        # 1.25 porque golang.org/x/crypto 0.55.0 e x/net 0.55.0 declaram
+        # `go 1.25.0` — abaixo disso o módulo nem carrega.
+        default: "1.25"
+      python_version:
+        required: false
+        type: string
+        default: "3.12"
+      image_version:
+        description: "Versão semântica usada como prefixo da tag da imagem"
+        required: false
+        type: string
+        default: "v1.0.0"
+      aws_region:
+        required: false
+        type: string
+        default: "us-east-1"
+      gitops_repo:
+        description: "owner/repo do repositório GitOps; obrigatório quando DEPLOY_ENABLED=true"
+        required: false
+        type: string
+        default: ""
+      gitops_path:
+        description: "Caminho alternativo do kustomization, para o runbook"
+        required: false
+        type: string
+        default: ""
+      gitops_overlay:
+        description: "Overlay do Kustomize atualizado pelo CI"
+        required: false
+        type: string
+        default: "dev"
+    secrets:
+      AWS_ROLE_ARN:
+        description: "Role OIDC; obrigatória somente quando DEPLOY_ENABLED=true"
+        required: false
+      GITOPS_SSH_KEY:
+        description: "Deploy key SSH exclusiva com escrita no GitOps; obrigatória para publicação"
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  # Falha o build a partir desta severidade
+  BLOCKING_SEVERITY: CRITICAL
+  OTEL_SDK_DISABLED: "true"
+  # Ausente/false: todos os gates rodam, sem OIDC, push ou promoção GitOps.
+  PUBLISH_ENABLED: ${{ vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+
+jobs:
+  # ===========================================================================
+  # 1. BUILD & UNIT TEST
+  # ===========================================================================
+  build-test:
+    name: Build & Unit Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.service }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configurar Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ inputs.go_version }}
+          cache-dependency-path: ${{ inputs.service }}/go.sum
+
+      - name: Compilar (Go)
+        if: inputs.language == 'go'
+        run: |
+          go mod download
+          go mod verify
+          go build -mod=readonly -v ./...
+
+      - name: Testes unitários (Go)
+        if: inputs.language == 'go'
+        run: go test -mod=readonly ./... -v -race -coverprofile=coverage.out -covermode=atomic
+
+      - name: Configurar Python
+        if: inputs.language == 'python'
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: pip
+          cache-dependency-path: ${{ inputs.service }}/requirements*.txt
+
+      - name: Instalar dependências (Python)
+        if: inputs.language == 'python'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Testes unitários (Python)
+        if: inputs.language == 'python'
+        run: pytest -v --cov=. --cov-report=term-missing --cov-report=xml
+
+      - name: Publicar relatório de cobertura
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: coverage-${{ inputs.service }}
+          path: |
+            ${{ inputs.service }}/coverage.out
+            ${{ inputs.service }}/coverage.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ===========================================================================
+  # 2. LINTER / STATIC ANALYSIS
+  # ===========================================================================
+  lint:
+    name: Linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configurar Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@v6
+        with:
+          # golangci-lint 2.13.2 declara Go 1.26 no módulo oficial.
+          go-version: "1.26"
+          cache-dependency-path: ${{ inputs.service }}/go.sum
+
+      - name: go vet
+        if: inputs.language == 'go'
+        working-directory: ${{ inputs.service }}
+        run: |
+          go mod download
+          go mod verify
+          go vet -mod=readonly ./...
+
+      # gofmt como passo proprio, e nao como linter do golangci: assim a saida
+      # lista exatamente quais arquivos estao fora do formato, sem depender de
+      # como cada versao do golangci trata a regra.
+      - name: gofmt
+        if: inputs.language == 'go'
+        working-directory: ${{ inputs.service }}
+        run: |
+          fora=$(gofmt -l .)
+          if [ -n "$fora" ]; then
+            echo "Arquivos fora do formato do gofmt:"
+            echo "$fora"
+            for f in $fora; do
+              echo "::error file=${{ inputs.service }}/$f,title=gofmt::Arquivo fora do formato. Rode 'gofmt -w $f'."
+            done
+            exit 1
+          fi
+          echo "Todos os arquivos estao formatados."
+
+      # Instalado por `go install` em vez da action: a versao fica pinada de
+      # forma inequivoca e aparece no log antes de qualquer analise.
+      - name: golangci-lint
+        if: inputs.language == 'go'
+        working-directory: ${{ inputs.service }}
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+          golangci-lint --version
+
+          # A configuração é validada antes da análise: um erro de config sai
+          # com o mesmo código de um achado real, e sem isso os dois viram a
+          # mesma mensagem opaca ("exit code 3").
+          echo "--- verificando o .golangci.yml ---"
+          golangci-lint config verify
+          golangci-lint config path
+
+          set +e
+          GOFLAGS=-mod=readonly golangci-lint run --timeout=5m > lint.out 2>&1
+          rc=$?
+          set -e
+
+          cat lint.out
+
+          if [ "$rc" -ne 0 ]; then
+            # Cada linha do relatório vira anotação, para o motivo aparecer no
+            # Pull Request sem precisar de permissão de admin no repositório.
+            head -30 lint.out | while IFS= read -r linha; do
+              if [ -n "$linha" ]; then
+                echo "::error title=golangci-lint (${{ inputs.service }})::${linha}"
+              fi
+            done
+            exit "$rc"
+          fi
+
+      - name: Configurar Python
+        if: inputs.language == 'python'
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: flake8 + ruff
+        if: inputs.language == 'python'
+        working-directory: ${{ inputs.service }}
+        run: |
+          pip install flake8 ruff
+          # Erros de sintaxe e nomes indefinidos quebram o build
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Demais achados de estilo são informativos
+          flake8 . --count --exit-zero --max-complexity=12 --max-line-length=120 --statistics
+          ruff check .
+
+  # ===========================================================================
+  # 3. SAST — Static Application Security Testing
+  # ===========================================================================
+  sast:
+    name: SAST
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configurar Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ inputs.go_version }}
+          cache-dependency-path: ${{ inputs.service }}/go.sum
+
+      - name: gosec (Go)
+        if: inputs.language == 'go'
+        working-directory: ${{ inputs.service }}
+        run: |
+          go mod download
+          go mod verify
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+
+          # SARIF completo, com TODAS as regras, para a aba Security.
+          gosec -no-fail -fmt sarif -out "${GITHUB_WORKSPACE}/sast.sarif" ./...
+
+          # JSON que decide o build. G704 e G706 ficam de fora AQUI — e só aqui.
+          # Elas são regras de análise de taint, e o gosec standalone não aplica
+          # supressão a esse tipo de achado: mesmo com a anotação na linha, o
+          # relatório acusa "Nosec: 0". Não é perda de cobertura: as duas seguem
+          # ativas no job Linter, via golangci-lint, onde a supressão por linha
+          # funciona — uma chamada nova sem sanitização continua reprovando.
+          gosec -no-fail -exclude=G704,G706 -fmt json -out "${GITHUB_WORKSPACE}/gosec-report.json" ./...
+
+          # Saída legível no log, para quem estiver acompanhando o run
+          gosec -no-fail -fmt text ./...
+
+      - name: Porta de qualidade — SAST (severidade alta)
+        if: inputs.language == 'go'
+        run: python3 .github/scripts/sast_gate.py gosec-report.json "SAST ${{ inputs.service }}"
+
+      - name: Configurar Python
+        if: inputs.language == 'python'
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: bandit (Python)
+        if: inputs.language == 'python'
+        working-directory: ${{ inputs.service }}
+        run: |
+          pip install bandit
+          # Relatório completo, sem quebrar o build
+          bandit -r . -f json -o "${GITHUB_WORKSPACE}/bandit-report.json" \
+            --exclude ./tests,./venv --exit-zero
+          bandit -r . -f screen --exclude ./tests,./venv --exit-zero
+          # Porta de qualidade: -lll = severidade HIGH, -ii = confiança média+
+          bandit -r . -lll -ii --exclude ./tests,./venv
+
+      - name: Publicar relatório do bandit
+        if: inputs.language == 'python' && always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: bandit-${{ inputs.service }}
+          path: bandit-report.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Enviar SARIF do gosec para o GitHub Security
+        if: inputs.language == 'go' && always()
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
+        with:
+          sarif_file: sast.sarif
+          category: sast-${{ inputs.service }}
+
+  # ===========================================================================
+  # 4. SCA — Software Composition Analysis (dependências) + segredos
+  # ===========================================================================
+  sca:
+    name: SCA
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Trivy — relatório completo (informativo)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: fs
+          scan-ref: ${{ inputs.service }}
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy-fs.sarif
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: "0"
+
+      - name: Enviar SARIF para o GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: trivy-fs.sarif
+          category: sca-${{ inputs.service }}
+
+      # Os dois portões ficam separados de propósito: quando um build é
+      # reprovado, o nome do job já diz se o problema é uma dependência
+      # vulnerável ou um segredo commitado — são incidentes bem diferentes.
+      - name: Trivy — apuração das dependências CRITICAL
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: fs
+          scan-ref: ${{ inputs.service }}
+          scanners: vuln
+          format: json
+          output: trivy-critical.json
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+
+      # A porta de qualidade em si é este passo, e não o do Trivy: assim cada
+      # CVE vira uma anotação do GitHub, visível no Pull Request e na lista de
+      # checks. Quem for corrigir vê o pacote, a versão instalada e a versão
+      # corrigida sem precisar abrir o log.
+      - name: Porta de qualidade — dependências vulneráveis (CRITICAL)
+        run: python3 .github/scripts/sca_gate.py trivy-critical.json "SCA ${{ inputs.service }}"
+
+      - name: Porta de qualidade — segredos no código
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: fs
+          scan-ref: ${{ inputs.service }}
+          scanners: secret
+          format: table
+          exit-code: "1"
+
+  # ===========================================================================
+  # 5. DOCKER BUILD + CONTAINER SCAN + PUSH NO ECR
+  # ===========================================================================
+  image:
+    name: Build & Scan (publicação opcional)
+    runs-on: ubuntu-latest
+    needs: [build-test, lint, sast, sca]
+    permissions:
+      contents: read
+      id-token: write # necessário para o OIDC com a AWS
+      security-events: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+      image_uri: ${{ steps.uri.outputs.uri }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Calcular a tag da imagem
+        id: meta
+        run: |
+          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+          TAG="${{ inputs.image_version }}-${SHORT_SHA}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Tag da imagem: ${TAG}"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build da imagem (carregada localmente para o scan)
+        uses: docker/build-push-action@v7
+        with:
+          context: ./${{ inputs.service }}
+          push: false
+          load: true
+          tags: ${{ inputs.service }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha,scope=${{ inputs.service }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.service }}
+          provenance: false
+
+      - name: Trivy — scan da imagem (relatório)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: image
+          image-ref: ${{ inputs.service }}:${{ steps.meta.outputs.tag }}
+          format: sarif
+          output: trivy-image.sarif
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: "0"
+
+      - name: Enviar SARIF do container
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: trivy-image.sarif
+          category: container-${{ inputs.service }}
+
+      - name: Trivy — porta de qualidade do container (bloqueia em CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: image
+          image-ref: ${{ inputs.service }}:${{ steps.meta.outputs.tag }}
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Gerar SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: image
+          image-ref: ${{ inputs.service }}:${{ steps.meta.outputs.tag }}
+          format: cyclonedx
+          output: sbom-${{ inputs.service }}.cdx.json
+
+      - name: Publicar SBOM como artefato
+        uses: actions/upload-artifact@v6
+        with:
+          name: sbom-${{ inputs.service }}-${{ steps.meta.outputs.tag }}
+          path: sbom-${{ inputs.service }}.cdx.json
+          retention-days: 30
+
+      - name: Validar configuração da publicação
+        if: env.PUBLISH_ENABLED == 'true'
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+          GITOPS_SSH_KEY: ${{ secrets.GITOPS_SSH_KEY }}
+          GITOPS_REPO: ${{ inputs.gitops_repo }}
+        run: |
+          missing=0
+          for name in AWS_ROLE_ARN GITOPS_SSH_KEY GITOPS_REPO; do
+            if [ -z "${!name}" ]; then
+              echo "::error::DEPLOY_ENABLED=true exige ${name} configurado."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Validar janela antes da autenticação AWS
+        if: env.PUBLISH_ENABLED == 'true'
+        env:
+          CLOUD_EXPIRES_AT: ${{ vars.CLOUD_EXPIRES_AT }}
+        run: python3 .github/scripts/cloud_window.py
+
+      - name: Autenticar na AWS via OIDC
+        if: env.PUBLISH_ENABLED == 'true'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: gha-${{ inputs.service }}-${{ github.run_id }}
+
+      - name: Login no Amazon ECR
+        if: env.PUBLISH_ENABLED == 'true'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compor a URI completa da imagem
+        if: env.PUBLISH_ENABLED == 'true'
+        id: uri
+        run: |
+          URI="${{ steps.ecr.outputs.registry }}/${{ inputs.service }}:${{ steps.meta.outputs.tag }}"
+          echo "uri=${URI}" >> "$GITHUB_OUTPUT"
+          echo "Imagem: ${URI}"
+
+      - name: Revalidar janela antes de publicar no ECR
+        if: env.PUBLISH_ENABLED == 'true'
+        env:
+          CLOUD_EXPIRES_AT: ${{ vars.CLOUD_EXPIRES_AT }}
+        run: python3 .github/scripts/cloud_window.py
+
+      # Publica exatamente a imagem que passou pelo scan; não faz um segundo build.
+      - name: Push da imagem validada para o ECR
+        id: publish
+        if: env.PUBLISH_ENABLED == 'true'
+        env:
+          LOCAL_IMAGE: ${{ inputs.service }}:${{ steps.meta.outputs.tag }}
+          IMAGE_URI: ${{ steps.uri.outputs.uri }}
+        run: |
+          docker tag "$LOCAL_IMAGE" "$IMAGE_URI"
+          docker push "$IMAGE_URI"
+
+      - name: Resumo do job
+        if: always()
+        env:
+          SERVICE: ${{ inputs.service }}
+          IMAGE_TAG: ${{ steps.meta.outputs.tag }}
+          IMAGE_URI: ${{ steps.uri.outputs.uri }}
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo "### ${SERVICE}"
+            echo ""
+            echo "- Validação da imagem: ${JOB_STATUS}"
+            echo "- Tag local: ${IMAGE_TAG}"
+            if [ "$PUBLISH_OUTCOME" = "success" ]; then
+              echo "- Imagem publicada no ECR: ${IMAGE_URI}"
+              echo "- Promoção GitOps: verificar o job seguinte; publicação não comprova deploy."
+            elif [ "$PUBLISH_ENABLED" = "true" ]; then
+              echo "- Publicação habilitada, mas não concluída."
+            else
+              echo "- Bootstrap/validação: publicação AWS e promoção GitOps desativadas."
+              echo "- Este resultado não representa deploy concluído."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ===========================================================================
+  # 6. GITOPS — promove a nova imagem alterando o repositório de manifestos
+  # ===========================================================================
+  # Este é o ponto onde o CI termina e o CD (Argo CD) começa. O pipeline NÃO
+  # roda kubectl: ele apenas faz um commit. Quem aplica no cluster é o Argo CD.
+  update-gitops:
+    name: Atualizar repositório GitOps
+    runs-on: ubuntu-latest
+    needs: image
+    if: vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # Serializa o mesmo serviço sem cancelar promoções pendentes de outros.
+    # Commits entre serviços usam o retry/rebase abaixo.
+    concurrency:
+      group: gitops-${{ inputs.gitops_repo }}-${{ inputs.gitops_overlay }}-${{ inputs.service }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout do código para validar a janela
+        uses: actions/checkout@v5
+        with:
+          path: app
+
+      - name: Validar janela antes da promoção GitOps
+        env:
+          CLOUD_EXPIRES_AT: ${{ vars.CLOUD_EXPIRES_AT }}
+        run: python3 app/.github/scripts/cloud_window.py
+
+      - name: Checkout do repositório GitOps
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ inputs.gitops_repo }}
+          ssh-key: ${{ secrets.GITOPS_SSH_KEY }}
+          path: gitops
+
+      - name: Instalar kustomize
+        run: |
+          KUSTOMIZE_VERSION=5.5.0
+          curl -sSL -o kustomize.tar.gz \
+            "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          tar -xzf kustomize.tar.gz
+          sudo mv kustomize /usr/local/bin/
+          kustomize version
+
+      - name: Atualizar a tag da imagem no overlay
+        working-directory: gitops/${{ inputs.gitops_path || format('apps/overlays/{0}/{1}', inputs.gitops_overlay, inputs.service) }}
+        run: |
+          kustomize edit set image "${{ inputs.service }}=${{ needs.image.outputs.image_uri }}"
+          echo "--- kustomization.yaml resultante ---"
+          cat kustomization.yaml
+
+      - name: Revalidar janela antes do commit GitOps
+        env:
+          CLOUD_EXPIRES_AT: ${{ vars.CLOUD_EXPIRES_AT }}
+        run: python3 app/.github/scripts/cloud_window.py
+
+      - name: Commit e push
+        working-directory: gitops
+        env:
+          CLOUD_EXPIRES_AT: ${{ vars.CLOUD_EXPIRES_AT }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet; then
+            echo "Nenhuma alteração — a tag já estava atualizada."
+            exit 0
+          fi
+
+          git add -- "${{ inputs.gitops_path || format('apps/overlays/{0}/{1}', inputs.gitops_overlay, inputs.service) }}/kustomization.yaml"
+          git commit -m "deploy(${{ inputs.service }}): ${{ needs.image.outputs.image_tag }}
+
+          Origem: ${{ github.repository }}@${{ github.sha }}
+          Workflow: ${{ github.workflow }} #${{ github.run_number }}"
+
+          # Outro serviço pode ter commitado enquanto este job rodava
+          for i in 1 2 3 4 5; do
+            if git pull --rebase --autostash; then
+              # Uma retentativa também precisa continuar dentro da janela.
+              python3 ../app/.github/scripts/cloud_window.py
+              git push && exit 0
+            fi
+            echo "Push falhou (tentativa $i). Retentando..."
+            sleep $((i * 3))
+          done
+          echo "Não foi possível atualizar o repositório GitOps."
+          exit 1
+
+      - name: Resumo do job
+        run: |
+          {
+            echo "### GitOps atualizado"
+            echo ""
+            echo "- Serviço: \`${{ inputs.service }}\`"
+            echo "- Nova imagem: \`${{ needs.image.outputs.image_uri }}\`"
+            echo "- Repositório: \`${{ inputs.gitops_repo }}\`"
+            echo ""
+            echo "Commit publicado; confirmar a sincronização e a saúde no Argo CD para atestar o deploy."
+          } >> "$GITHUB_STEP_SUMMARY"

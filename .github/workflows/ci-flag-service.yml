@@ -1,0 +1,40 @@
+# Pipeline DevSecOps do flag-service.
+# A lógica vive em _reusable-ci.yml — aqui ficam apenas os gatilhos e os inputs.
+name: CI flag-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "flag-service/**"
+      - ".github/workflows/ci-flag-service.yml"
+      - ".github/workflows/_reusable-ci.yml"
+      - ".github/scripts/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "flag-service/**"
+      - ".github/workflows/ci-flag-service.yml"
+      - ".github/workflows/_reusable-ci.yml"
+      - ".github/scripts/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-flag-service-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+  security-events: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_reusable-ci.yml
+    with:
+      service: flag-service
+      language: python
+      gitops_repo: ${{ vars.GITOPS_REPO }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      GITOPS_SSH_KEY: ${{ secrets.GITOPS_SSH_KEY }}

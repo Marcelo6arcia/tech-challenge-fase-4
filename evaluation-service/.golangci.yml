@@ -1,0 +1,32 @@
+# Formato do golangci-lint v2. A v1 nao serve mais: ela e compilada com Go 1.23
+# e recusa modulos que declaram `go 1.25.0` — que e o que golang.org/x/crypto
+# 0.55.0 exige.
+version: "2"
+
+run:
+  tests: true
+
+linters:
+  # standard = errcheck, govet, ineffassign, staticcheck e unused.
+  # Na v2 o gosimple foi absorvido pelo staticcheck.
+  default: standard
+  enable:
+    - bodyclose
+    - gosec
+    # misspell fica de fora: o dicionário é de inglês e acusa palavras em
+    # português nos comentários ("Eles" -> "Eels", "Clientes" -> "Clients")
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+    gosec:
+      # G104 (erros não tratados) já é coberto pelo errcheck
+      excludes:
+        - G104
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec

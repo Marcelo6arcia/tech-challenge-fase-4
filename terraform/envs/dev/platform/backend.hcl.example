@@ -1,0 +1,7 @@
+# Copie para backend.hcl. Uso: terraform init -backend-config=backend.hcl
+bucket       = "togglemaster-tfstate-xxxxxxxx"
+key          = "togglemaster/fase4/platform.tfstate"
+region       = "us-east-1"
+encrypt      = true
+use_lockfile = true
+profile      = "fiap"

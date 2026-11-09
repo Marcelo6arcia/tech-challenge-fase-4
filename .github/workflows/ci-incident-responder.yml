@@ -1,0 +1,24 @@
+name: CI incident-responder
+on:
+  push:
+    branches: [main]
+    paths: ["incident-responder/**", ".github/workflows/ci-incident-responder.yml", ".github/workflows/_reusable-ci.yml", ".github/scripts/**"]
+  pull_request:
+    branches: [main]
+    paths: ["incident-responder/**", ".github/workflows/ci-incident-responder.yml", ".github/workflows/_reusable-ci.yml", ".github/scripts/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+  security-events: write
+jobs:
+  ci:
+    uses: ./.github/workflows/_reusable-ci.yml
+    with:
+      service: incident-responder
+      language: python
+      gitops_repo: ${{ vars.GITOPS_REPO }}
+      gitops_path: observability/responder
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      GITOPS_SSH_KEY: ${{ secrets.GITOPS_SSH_KEY }}

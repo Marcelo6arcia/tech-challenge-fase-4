@@ -1,0 +1,8 @@
+# Copie para backend.hcl e preencha com o bucket devolvido por terraform/bootstrap.
+# Uso: terraform init -backend-config=backend.hcl
+bucket       = "togglemaster-tfstate-xxxxxxxx"
+key          = "togglemaster/fase4/infra.tfstate"
+region       = "us-east-1"
+encrypt      = true
+use_lockfile = true
+profile      = "fiap"
