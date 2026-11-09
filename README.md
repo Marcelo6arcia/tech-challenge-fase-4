@@ -57,6 +57,8 @@ O CI remoto aprovou os seis pipelines de build/segurança, GitOps, integração 
 
 Repositórios públicos: [aplicação/IaC/CI](https://github.com/Marcelo6arcia/tech-challenge-fase-4) e [GitOps](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4). A entrega anterior foi preservada.
 
+Antes de iniciar a janela AWS de 72 horas, validar os acessos conforme [Contas acadêmicas a preparar](docs/HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar). Em 09/11/2026, a documentação do New Relic informa ativação Students via suporte, com self-service indisponível e sem prazo garantido identificado. O cadastro PagerDuty Developer tem relato oficial de rejeição de Gmail em 2025, sem confirmação de bloqueio atual. Cadastro Free, benefício estudantil e acesso individual às telas são verificações distintas.
+
 1. Configurar `GITOPS_REPO`, roles OIDC, bucket de state e CIDRs permitidos. A promoção usa `GITOPS_SSH_KEY`, exclusiva do GitOps. O ID do novo repositório está declarado no Terraform. `DEPLOY_ENABLED=false` mantém testes, segurança e build/scan ativos, sem publicação ou promoção; `INFRA_ENABLED=false` mantém somente a análise estática de IaC.
 2. Preencher arquivos locais de backend/tfvars a partir dos exemplos. Estados da fase 4 usam `togglemaster/fase4/infra.tfstate` e `togglemaster/fase4/platform.tfstate`.
 3. Gerar e revisar o plano da infraestrutura antes de aplicar:

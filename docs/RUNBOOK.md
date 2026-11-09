@@ -120,7 +120,7 @@ Erros de conexão apontam para Service/DNS/rede; rejeição de configuração ap
 
 ## 5. Trace ou Service Map ausente no APM
 
-1. Confirmar que a conta New Relic e a chave de ingestão foram realmente preparadas. A existência de um Secret com nome correto não comprova validade da chave.
+1. Confirmar que a conta New Relic e a chave de ingestão foram realmente preparadas. A existência de um Secret com nome correto não comprova validade da chave. Conferir também o benefício Students aplicado e o tipo do usuário que abrirá o APM: a conta Free comum inclui somente um usuário completo e Basic não acessa essa interface. Os passos e limites de cadastro estão no [handoff](HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar).
 2. Conferir conta/região e endpoint configurados no exporter `otlphttp/newrelic`, sem exibir o header `api-key`. Endpoint atual do código: `https://otlp.nr-data.net:4318`; alinhar à região da conta antes de implantar.
 3. Observar logs do gateway: 401/403 sugerem autenticação/permissão; timeout pode indicar saída de rede/DNS. Não imprimir configurações resolvidas com credenciais.
 4. Fazer uma requisição nova com `demo.py trace`, localizar o ID atual no APM e usar janela de tempo coerente.
