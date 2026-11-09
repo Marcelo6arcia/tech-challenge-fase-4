@@ -22,6 +22,7 @@ Se um requisito não funcionar durante o ensaio, volta para Marcelo antes da gra
 | Evento de negócio | Evento correspondente localizado no DynamoDB do LocalStack. | Não comprova DynamoDB/SQS da AWS. |
 | Três sinais | Métricas no Prometheus, logs OTLP correlacionados e nove linhas correspondentes no Loki para o trace do smoke. | Integração Docker local. |
 | Testes e build | 36 testes Python dos serviços; testes Go com race detector, vet e lint; 15 testes do runbook; builds Docker aprovados. | Testes locais; Kubernetes e integrações externas não são simulados como prova final. |
+| CI remoto | Seis pipelines de build/segurança, integração completa, GitOps e Terraform estático aprovados; [execuções e commits](evidencias/CI_BOOTSTRAP.md). | ECR, promoção GitOps e plan/apply cloud ainda desabilitados. Não comprova implantação. |
 | Configurações da stack | Helm/Kustomize, configurações Collector/Loki, Promtool e provisionamento Grafana conferidos localmente. | Renderização/configuração válida não significa instalação no cluster. |
 | Segurança local | SCA dos seis serviços e scan das seis imagens passaram no filtro CRITICAL com correção disponível, após corrigir quatro imagens Python. Smoke repetido com as novas imagens passou. | Gate local; não substitui os pipelines remotos ou scan das futuras imagens publicadas. |
 | AWS acadêmica | Inventário não encontrou EKS, RDS ou ECR; bucket de backend existente. Prévia infra: 115 criações, zero alterações e zero exclusões. | Consulta/plan; nenhum apply. Plataforma ainda depende do cluster. |

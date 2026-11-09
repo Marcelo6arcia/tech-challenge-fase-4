@@ -2,7 +2,7 @@
 
 Aplicação, infraestrutura e CI da fase 4 do Tech Challenge FIAP. O GitOps fica no repositório irmão `../togglemaster-gitops`. Esta cópia preserva a entrega anterior e adiciona observabilidade e resposta automática a incidente.
 
-**Estado em 09/11/2026: implementação e integração local validadas; ainda não liberado para gravação.** Falta a prova no EKS, New Relic, PagerDuty e canal ChatOps. Pacote para Vinicius: 12/11. Entrega acadêmica: 15/11.
+**Estado em 09/11/2026: implementação, integração local e CI remoto validados; ainda não liberado para gravação.** Falta a prova no EKS, New Relic, PagerDuty e canal ChatOps. Pacote para Vinicius: 12/11. Entrega acadêmica: 15/11.
 
 ## Executar a prova local
 
@@ -49,9 +49,9 @@ O responder é uma automação operacional; o ecossistema continua com cinco mic
 - Terraform: fmt/validate e prévia da infraestrutura com 115 criações, zero alterações e zero exclusões. Nenhum apply.
 - Segurança: SCA dos seis serviços e seis imagens aprovadas no filtro CRITICAL com correção disponível do CI. Quatro imagens Python corrigidas e integração repetida após o rebuild. [Evidência do gate](docs/evidencias/SECURITY_LOCAL.md) e [smoke final](docs/evidencias/LOCAL_SMOKE.json).
 
-As validações de Helm/Grafana/Collector estão no `README.md` do repositório GitOps da fase 4, disponível localmente em `../togglemaster-gitops`. Execuções GitHub Actions e aceitação em cloud são etapas diferentes e ainda pendentes.
+As validações de Helm/Grafana/Collector estão no `README.md` do repositório GitOps da fase 4, disponível localmente em `../togglemaster-gitops`. Execuções GitHub Actions e aceitação em cloud são etapas diferentes; a implantação e a prova no ambiente final continuam pendentes.
 
-Os workflows remotos foram iniciados, mas erros internos do GitHub impediram sua conclusão integral. O [registro do bootstrap do CI](docs/evidencias/CI_BOOTSTRAP.md) distingue os jobs executados, as correções e as verificações ainda pendentes. Isso não altera o resultado dos testes locais nem libera a gravação.
+O CI remoto aprovou os seis pipelines de build/segurança, GitOps, integração completa e validação estática Terraform. O [registro do bootstrap do CI](docs/evidencias/CI_BOOTSTRAP.md) distingue os resultados atuais e as correções; gravação e deploy ainda não estão liberados.
 
 ## Preparar infraestrutura e CI
 

@@ -2,6 +2,24 @@
 
 Os dois repositórios estão públicos: [aplicação/IaC](https://github.com/Marcelo6arcia/tech-challenge-fase-4) e [GitOps](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4). A entrega anterior permaneceu intacta. Arquivos pessoais, configurações reais, planos brutos, state e chaves privadas não fazem parte dos commits.
 
+## Resultado atual
+
+- **GitOps aprovado:** [42674394167](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4/actions/runs/42674394167), commit `f5171a6`.
+- **Integração aprovada:** [42674019431](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42674019431), commit `574b58f`. Health, avaliação, DynamoDB local, trace ligado nos cinco serviços, logs OTLP/Loki e métricas Prometheus passaram; 15 testes do runbook passaram. Trace de referência `188fffc540ddb681c5b0d3fe239b14a2`. É prova Docker no runner, não APM/EKS.
+- **Terraform estático aprovado:** [42674558325](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42674558325), commit `cf8071c`. Formatação, três testes das proteções, criptografia sintética, dez módulos, TFLint, Checkov e gate Trivy executaram com sucesso. Checkov permanece informativo conforme a política existente; sucesso do job não significa ausência de todos os achados. Plan/apply cloud foram ignorados por estarem desabilitados.
+- **Seis pipelines individuais aprovados:** testes/build, lint, SAST, SCA, gate CRITICAL da imagem e SBOM concluídos. Publicação ECR e promoção GitOps ficaram desabilitadas, assim como OIDC/login AWS.
+
+| Componente | Execução aprovada | Commit |
+|---|---|---|
+| auth-service | [42675235854](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42675235854) | `cf8071c` |
+| evaluation-service | [42674536545](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42674536545) | `574b58f` |
+| flag-service | [42675235593](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42675235593) | `cf8071c` |
+| targeting-service | [42675235625](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42675235625) | `cf8071c` |
+| analytics-service | [42675236134](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42675236134) | `cf8071c` |
+| incident-responder | [42675236085](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42675236085) | `cf8071c` |
+
+Os arquivos do evaluation, seu caller, workflow reutilizável e scripts do CI não mudaram entre `574b58f` e `cf8071c`. Foram confirmados 30 jobs de qualidade com sucesso nos seis pipelines. O responder é automação operacional; os microsserviços de negócio continuam sendo cinco.
+
 ## Configuração verificada
 
 - `DEPLOY_ENABLED=false` e `INFRA_ENABLED=false`: CI executa validações locais; publicação ECR, promoção GitOps e operações Terraform cloud ficam desabilitadas.
@@ -21,12 +39,12 @@ Os dois repositórios estão públicos: [aplicação/IaC](https://github.com/Mar
 
 ## Execuções remotas e limites
 
-As primeiras execuções da aplicação tiveram anotações `Internal server error` do GitHub antes de alguns jobs iniciarem. Foram feitas novas tentativas dos sete workflows, no commit `2a0424c`; elas também receberam erro interno. Os sete jobs efetivamente iniciados nessa segunda rodada passaram, mas **scans de imagem e integração não concluíram**. Exemplo: [integração, segunda tentativa](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42672215926). Não há aprovação integral do CI remoto.
+As primeiras execuções da aplicação tiveram anotações `Internal server error` do GitHub antes de alguns jobs iniciarem. Foram feitas novas tentativas dos sete workflows, no commit `2a0424c`; elas também receberam erro interno. Os sete jobs efetivamente iniciados nessa segunda rodada passaram, mas **scans de imagem e integração não concluíram**. Exemplo: [integração, segunda tentativa](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42672215926). Essas duas rodadas iniciais não comprovaram aprovação integral; as execuções aprovadas posteriores estão na tabela de resultados atuais acima.
 
-No Terraform, foi corrigida a posição da trava de horário: análise estática não depende da janela cloud. As execuções seguintes falharam antes de criar jobs; [run 42672428590](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42672428590) registrou erro interno com correlação `bd148d1f-5e7c-4a84-ae14-d7ca3948159f`. A execução posterior [42673682282](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42673682282) completou formatação, três testes das proteções e a criptografia sintética. Ela encontrou uma variável de CIDR vazia no ambiente global durante o init isolado do módulo EKS; as variáveis cloud foram movidas para os jobs plan/apply, preservando a validação estática independente dos secrets. A rodada completa após essa correção ainda precisa concluir.
+No Terraform, foi corrigida a posição da trava de horário: análise estática não depende da janela cloud. As execuções seguintes falharam antes de criar jobs; [run 42672428590](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42672428590) registrou erro interno com correlação `bd148d1f-5e7c-4a84-ae14-d7ca3948159f`. A execução posterior [42673682282](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42673682282) completou formatação, três testes das proteções e a criptografia sintética. Ela encontrou uma variável de CIDR vazia no ambiente global durante o init isolado do módulo EKS; as variáveis cloud foram movidas para os jobs plan/apply, preservando a validação estática independente dos secrets. A rodada completa depois dessa correção passou no run `42674558325`, conforme o resultado atual acima.
 
 No GitOps, [run 42672000778](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4/actions/runs/42672000778) executou setup, Kustomize e cinco Helm templates, mas promtool não conseguiu ler o diretório temporário privado no Linux. A correção usa o UID/GID do proprietário do arquivo, preservando diretório privado e mount somente leitura. A causa foi reproduzida em Linux e os quatro cenários passaram localmente. Publicada em `f5171a6`; o [run seguinte](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4/actions/runs/42672453170) falhou antes dos jobs com erro interno, correlação `2cbc9da0-622c-4aa9-96e1-c874d09e0f76`.
 
 Depois dessa falha interna, o [run 42674394167](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4/actions/runs/42674394167), no mesmo commit `f5171a6`, **passou integralmente**: Kustomize, cinco charts Helm, dashboard e quatro cenários do alerta. A correção de UID/GID está comprovada no runner Linux.
 
-O status oficial consultado não indicava incidente geral; os erros acima são evidência destas execuções, não prova de indisponibilidade global. Repetir os workflows após a recuperação e registrar os resultados recentes antes de habilitar deploy. Nenhum gate foi removido para obter resultado verde.
+O status oficial consultado não indicava incidente geral; os erros acima são evidência destas execuções, não prova de indisponibilidade global. Os workflows foram repetidos e concluídos, conforme os resultados atuais acima. Nenhum gate foi removido para obter resultado verde. A prova de implantação em AWS/APM/incidente continua sendo uma etapa diferente, ainda pendente.
