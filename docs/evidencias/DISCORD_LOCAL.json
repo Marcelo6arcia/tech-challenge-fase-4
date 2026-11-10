@@ -1,0 +1,150 @@
+{
+  "scope": "Docker fiap4 -> Grafana -> Discord; recuperacao manual; sem PagerDuty, responder ou EKS",
+  "date_brt": "2026-11-10",
+  "app_commit": "827b12ead9e423b4715fc0f9c807a40305cba70a",
+  "gitops_commit": "0c760b452b6e9814bed42520b1e49354e3a1ae0d",
+  "grafana_version": "12.3.1",
+  "helm_chart_version": "10.5.14",
+  "rule": "AuthHigh5xx",
+  "http_samples": {
+    "baseline-http": {
+      "recorded_at_utc": "2026-11-10T15:54:50.952299+00:00",
+      "result": {
+        "command": "status",
+        "health_http": {
+          "auth-service": 200,
+          "flag-service": 200,
+          "targeting-service": 200,
+          "evaluation-service": 200,
+          "analytics-service": 200
+        },
+        "auth_validate_samples": {
+          "200": 10
+        },
+        "note": "Health 200 não prova ausência de falha; observe /validate e o alerta."
+      }
+    },
+    "fault-http": {
+      "recorded_at_utc": "2026-11-10T15:56:11.102052+00:00",
+      "result": {
+        "command": "status",
+        "health_http": {
+          "auth-service": 200,
+          "flag-service": 200,
+          "targeting-service": 200,
+          "evaluation-service": 200,
+          "analytics-service": 200
+        },
+        "auth_validate_samples": {
+          "503": 10
+        },
+        "note": "Health 200 não prova ausência de falha; observe /validate e o alerta."
+      }
+    },
+    "recovered-http": {
+      "recorded_at_utc": "2026-11-10T15:56:39.837204+00:00",
+      "result": {
+        "command": "status",
+        "health_http": {
+          "auth-service": 200,
+          "flag-service": 200,
+          "targeting-service": 200,
+          "evaluation-service": 200,
+          "analytics-service": 200
+        },
+        "auth_validate_samples": {
+          "200": 10
+        },
+        "note": "Health 200 não prova ausência de falha; observe /validate e o alerta."
+      }
+    }
+  },
+  "fault": {
+    "recorded_at_utc": "2026-11-10T15:54:51.101171+00:00",
+    "result": {
+      "command": "fault",
+      "fault_active": true,
+      "note": "Falha em memória ativada. Aguarde o alerta e a automação; este script não reinicia pods."
+    }
+  },
+  "grafana_samples": {
+    "firing-status": {
+      "recorded_at_utc": "2026-11-10T15:56:10.946358+00:00",
+      "result": {
+        "grafana_database": "ok",
+        "version": "12.3.1",
+        "rule_file_paused": false,
+        "rules": [
+          {
+            "name": "AuthHigh5xx",
+            "state": "firing",
+            "health": "ok"
+          }
+        ]
+      }
+    },
+    "resolved-status": {
+      "recorded_at_utc": "2026-11-10T15:59:01.362008+00:00",
+      "result": {
+        "grafana_database": "ok",
+        "version": "12.3.1",
+        "rule_file_paused": false,
+        "rules": [
+          {
+            "name": "AuthHigh5xx",
+            "state": "inactive",
+            "health": "ok"
+          }
+        ]
+      }
+    }
+  },
+  "discord": {
+    "server": "FIAP — ToggleMaster Fase 4",
+    "channel": "alertas-fase4",
+    "webhook_name": "Grafana FIAP",
+    "verified_in_ui": true,
+    "screenshot_file_saved": false,
+    "messages": [
+      {
+        "status": "firing",
+        "starts_at_utc": "2026-11-10T15:55:40Z",
+        "ends_at_utc": null,
+        "fingerprint": "ce3ccb76701c998b"
+      },
+      {
+        "status": "resolved",
+        "starts_at_utc": "2026-11-10T15:55:40Z",
+        "ends_at_utc": "2026-11-10T15:57:20Z",
+        "fingerprint": "ce3ccb76701c998b"
+      }
+    ]
+  },
+  "load": {
+    "duration_seconds": 390.69,
+    "requested_rps": 5,
+    "requests": 1954,
+    "statuses": {
+      "200": 1540,
+      "503": 412,
+      "connection_error": 2
+    },
+    "interrupted": true,
+    "stop_reason": "Interrompida pelo operador somente apos confirmar Resolved e pausar/remover Grafana"
+  },
+  "recovery": "docker compose restart auth-service; MANUAL",
+  "cleanup": {
+    "grafana_paused_before_stop": true,
+    "fiap4_containers_remaining": 0,
+    "transport_present": false,
+    "admin_present": false,
+    "volumes_preserved": true
+  },
+  "limitations": [
+    "Origem local, apesar dos labels environment=dev e namespace=togglemaster preservados do GitOps",
+    "PagerDuty e responder nao habilitados neste ensaio",
+    "Nao comprova Self-Healing nem implantacao no EKS",
+    "AWS sem apply; janela72h nao iniciada",
+    "Capturas finais para o PDF ainda pendentes"
+  ]
+}

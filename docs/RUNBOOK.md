@@ -1,6 +1,6 @@
 # Runbook operacional — ToggleMaster fase 4
 
-> **NÃO LIBERADO PARA GRAVAÇÃO.** Estado em 09/11/2026 (BRT): integração Docker, CI remoto e ingestão de traces no New Relic confirmados. EKS, capturas finais, PagerDuty, ChatOps e Self-Healing no cluster ainda estão pendentes; a janela AWS de 72 horas não iniciou. Os comandos de cluster abaixo são procedimentos para o ambiente acadêmico quando ele estiver provisionado e validado; não foram executados como parte da escrita deste documento.
+> **NÃO LIBERADO PARA GRAVAÇÃO.** Estado em 10/11/2026 (BRT): integração Docker, CI remoto, traces no New Relic e mensagens reais Firing/Resolved no Discord confirmados. A prova de ChatOps partiu do Grafana local e teve recuperação manual. PagerDuty, o ensaio integrado no EKS com Self-Healing e as capturas finais continuam pendentes. Nenhum apply AWS ocorreu; a janela de 72 horas não iniciou. Os comandos de cluster abaixo são procedimentos para o ambiente acadêmico quando ele estiver provisionado e validado; não foram executados como parte da escrita deste documento.
 
 Escopo: diagnosticar observabilidade, alerta e automação da fase 4. Marcelo prepara e opera o ambiente; Vinicius recebe a sessão ensaiada para gravar, sem assumir implementação. Meta de passagem: 12/11/2026; entrega acadêmica: 15/11/2026.
 
@@ -184,7 +184,9 @@ python3 scripts/demo.py fault --mode cluster \
 
 ## 8. Firing sem PagerDuty ou ChatOps
 
-Pendência atual: o SUBMIT do cadastro PagerDuty retornou erro genérico, sem conta ativa confirmada. A restrição a e-mail gratuito é hipótese apoiada na documentação, não diagnóstico fechado; a solicitação de diagnóstico/liberação foi enviada ao suporte oficial em 09/11/2026 (BRT), após autorização. Aguardar orientação conforme o [handoff](HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar) antes do ensaio integrado.
+Estado confirmado: no [ensaio Docker local de 10/11](evidencias/DISCORD_LOCAL.md), Grafana 12.3.1 enviou Firing e Resolved do alerta real `AuthHigh5xx` ao Discord. As mensagens compartilham fingerprint `ce3ccb76701c998b` e início 15:55:40 UTC; a resolução registra fim 15:57:20 UTC (12:55:40–12:57:20 BRT). Dez amostras de `/validate` retornaram 200 antes, 503 durante e 200 após o restart **manual** de auth; Grafana terminou `inactive`/`health ok`. Apenas Discord estava habilitado, sem PagerDuty ou responder. As mensagens foram conferidas na interface, sem captura de imagem salva. Essa prova não substitui o ensaio EKS com mitigação automática.
+
+Pendência atual: o SUBMIT do cadastro PagerDuty retornou erro genérico, sem conta ativa confirmada. A restrição a e-mail gratuito é hipótese apoiada na documentação, não diagnóstico fechado; a solicitação de diagnóstico/liberação foi enviada ao suporte oficial em 09/11/2026 (BRT), após autorização. O suporte confirmou recebimento no caso `00867289`, ainda sem análise humana ou liberação. Aguardar orientação, sem reenviar a solicitação, conforme o [handoff](HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar) antes do ensaio integrado.
 
 Verificar no Grafana o contact point `togglemaster-incident`, os três receivers e a política de notificação. Confirmar na interface o resultado da entrega e, nas ferramentas externas, conta, serviço de incidente e canal acadêmico corretos. A integração deve estar configurada com credenciais acadêmicas, não de outros projetos.
 
