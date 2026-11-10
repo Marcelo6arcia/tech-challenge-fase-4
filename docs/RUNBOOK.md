@@ -184,11 +184,11 @@ python3 scripts/demo.py fault --mode cluster \
 
 ## 8. Firing sem PagerDuty ou ChatOps
 
-Pendência atual: o SUBMIT do cadastro PagerDuty retornou erro genérico, sem conta ativa confirmada. A restrição a e-mail gratuito é hipótese apoiada na documentação, não diagnóstico fechado; seguir a conferência de acesso/suporte descrita no [handoff](HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar) antes do ensaio integrado.
+Pendência atual: o SUBMIT do cadastro PagerDuty retornou erro genérico, sem conta ativa confirmada. A restrição a e-mail gratuito é hipótese apoiada na documentação, não diagnóstico fechado; a solicitação de diagnóstico/liberação foi enviada ao suporte oficial em 09/11/2026 (BRT), após autorização. Aguardar orientação conforme o [handoff](HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar) antes do ensaio integrado.
 
 Verificar no Grafana o contact point `togglemaster-incident`, os três receivers e a política de notificação. Confirmar na interface o resultado da entrega e, nas ferramentas externas, conta, serviço de incidente e canal acadêmico corretos. A integração deve estar configurada com credenciais acadêmicas, não de outros projetos.
 
-O webhook do runbook é um receiver separado das notificações PagerDuty/Discord. A entrega para um receiver não comprova a entrega para os demais. Teste de contact point pode validar conectividade, mas não substitui a prova de alerta real abrindo incidente e acionando a mitigação. Após corrigir, repetir o ensaio completo com um novo episódio, respeitando cooldown e o estado do alerta.
+O webhook do runbook é um receiver separado das notificações PagerDuty/Discord. Os três recebem o mesmo grupo de alerta em paralelo, com `group_wait: 0s` depois de a regra entrar em Firing; não há garantia de ordem entre entrega externa e mitigação. A resolução pode aguardar o `group_interval: 30s`. A entrega para um receiver não comprova a entrega para os demais. Teste de contact point pode validar conectividade, mas não substitui a prova de alerta real abrindo incidente e acionando a mitigação. Após corrigir, repetir o ensaio completo com um novo episódio, respeitando cooldown e o estado do alerta.
 
 ## 9. Webhook ou Self-Healing não executa
 

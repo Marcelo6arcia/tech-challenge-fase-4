@@ -58,3 +58,10 @@ No GitOps, [run 42672000778](https://github.com/Marcelo6arcia/togglemaster-gitop
 Depois dessa falha interna, o [run 42674394167](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4/actions/runs/42674394167), no mesmo commit `f5171a6`, **passou integralmente**: Kustomize, cinco charts Helm, dashboard e quatro cenários do alerta. A correção de UID/GID está comprovada no runner Linux.
 
 O status oficial consultado não indicava incidente geral; os erros acima são evidência destas execuções, não prova de indisponibilidade global. Os workflows foram repetidos e concluídos, conforme os resultados atuais acima. Nenhum gate foi removido para obter resultado verde. A prova de implantação em AWS/APM/incidente continua sendo uma etapa diferente, ainda pendente.
+
+
+## Notificações de incidente — 09/11/2026, 23:38 BRT
+
+A execução [42744168884](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4/actions/runs/42744168884), no commit GitOps `0c760b452b6e9814bed42520b1e49354e3a1ae0d`, passou com o job `validate` e todas as etapas concluídas. O log confirmou Kustomize, os cinco charts, quatro cenários do alerta, igualdade do dashboard e o novo contrato de notificações: contatos, mensagens de resolução, agrupamento, templates após Helm e referências de Secrets.
+
+O ajuste acrescenta horários UTC, condição/contexto e correlação ao Discord e aos detalhes do PagerDuty. Os templates firing/resolved também foram exercitados localmente com dados sintéticos. Nenhuma credencial real é necessária nesses validadores. Sucesso do CI não comprova cadastro PagerDuty, entrega Discord ou mitigação no EKS; essas provas permanecem separadas.
