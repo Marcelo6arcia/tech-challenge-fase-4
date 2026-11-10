@@ -167,6 +167,11 @@ func instrumentHTTP(service string, mux *http.ServeMux) http.Handler {
 		panic(err)
 	}
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Expose the real server trace for callers that start a new request without
+		// traceparent; the demo can correlate it without inventing an upstream span.
+		if sc := trace.SpanContextFromContext(r.Context()); sc.IsValid() {
+			w.Header().Set("X-Trace-Id", sc.TraceID().String())
+		}
 		_, route := mux.Handler(r)
 		if route == "" {
 			route = "unmatched"

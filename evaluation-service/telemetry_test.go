@@ -9,11 +9,45 @@ import (
 	"sync"
 	"testing"
 
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 	collectlogs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	collectmetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	collecttraces "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/proto"
 )
+
+func TestResponseTraceIDMatchesServerRoot(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	previous := otel.GetTracerProvider()
+	otel.SetTracerProvider(provider)
+	t.Cleanup(func() {
+		otel.SetTracerProvider(previous)
+		_ = provider.Shutdown(context.Background())
+	})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/evaluate", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	req := httptest.NewRequest(http.MethodGet, "/evaluate", nil)
+	req.Header.Set("X-Trace-Id", "caller-value-must-not-be-echoed")
+	response := httptest.NewRecorder()
+	instrumentHTTP("evaluation-service", mux).ServeHTTP(response, req)
+	spans := exporter.GetSpans()
+	if len(spans) != 1 {
+		t.Fatalf("expected one exported server span, got %d", len(spans))
+	}
+	span := spans[0]
+	if span.SpanKind != trace.SpanKindServer || span.Parent.IsValid() {
+		t.Fatal("request without traceparent must start a real server root")
+	}
+	if got := response.Result().Header.Get("X-Trace-Id"); got != span.SpanContext.TraceID().String() {
+		t.Fatalf("response trace ID does not match exported span: %q", got)
+	}
+}
 
 // This is an OTLP wire-level contract test: three real exporters send protobuf
 // to a local receiver. No Collector, cloud credentials or AWS resources are used.

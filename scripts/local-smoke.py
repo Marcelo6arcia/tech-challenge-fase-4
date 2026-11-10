@@ -63,7 +63,7 @@ def otlp_records(path, signal):
                         yield service, record
 
 
-def trace_evidence(path, trace_id, expected_parent):
+def trace_evidence(path, trace_id):
     spans = {}
     for service, record in otlp_records(path, "traces"):
         if otlp_id(record.get("traceId"), 16) == trace_id:
@@ -74,7 +74,7 @@ def trace_evidence(path, trace_id, expected_parent):
                     "kind": record.get("kind"), "name": record.get("name", ""),
                 }
     roots = [span_id for span_id, span in spans.items()
-             if span["service"] == "evaluation-service" and span["parent"] == expected_parent
+             if span["service"] == "evaluation-service" and span["parent"] == ""
              and span["kind"] in (2, "SPAN_KIND_SERVER")]
     if len(roots) != 1:
         return None
@@ -98,7 +98,8 @@ def trace_evidence(path, trace_id, expected_parent):
     if not producer_linked:
         return None
     return {"trace_id": trace_id, "services": sorted(linked), "span_count": len(spans),
-            "evaluation_server_span_id": root, "analytics_consumer_parent_is_producer": True}
+            "evaluation_server_span_id": root, "evaluation_server_is_root": True,
+            "analytics_consumer_parent_is_producer": True}
 
 
 def file_log_evidence(path, trace_id):
@@ -200,7 +201,7 @@ def main():
             "evento correspondente no DynamoDB local", lambda: dynamodb_evidence(target.env_file, state), args.timeout)
         report["checks"]["trace"] = wait_for(
             "trace ligado nos cinco serviços", lambda: trace_evidence(
-                ROOT / ".runs/telemetry/traces.json", state["trace_id"], state["parent_span_id"]), args.timeout)
+                ROOT / ".runs/telemetry/traces.json", state["trace_id"]), args.timeout)
         report["checks"]["otlp_logs"] = wait_for(
             "logs OTLP correlacionados nos cinco serviços", lambda: file_log_evidence(
                 ROOT / ".runs/telemetry/logs.json", state["trace_id"]), args.timeout)

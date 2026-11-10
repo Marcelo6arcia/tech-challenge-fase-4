@@ -86,7 +86,8 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def http_json(url, *, method="GET", key=None, body=None, traceparent=None, timeout=8):
+def http_json(url, *, method="GET", key=None, body=None, traceparent=None, timeout=8, return_trace_id=False):
+    """Return status/body; optionally append only the response correlation ID."""
     headers = {"Accept": "application/json"}
     if key:
         headers["Authorization"] = "Bearer " + key
@@ -96,19 +97,25 @@ def http_json(url, *, method="GET", key=None, body=None, traceparent=None, timeo
     if data is not None:
         headers["Content-Type"] = "application/json"
     request = Request(url, data=data, headers=headers, method=method)
+    response_trace_id = ""
     try:
         # Never forward credentials through a proxy selected by ambient env vars.
         with build_opener(ProxyHandler({}), NoRedirect()).open(request, timeout=timeout) as response:
             status, payload = response.status, response.read(1024 * 1024)
+            if return_trace_id:
+                response_trace_id = response.headers.get("X-Trace-Id", "")
     except HTTPError as error:
         status, payload = error.code, error.read(1024 * 1024)
+        if return_trace_id and error.headers is not None:
+            response_trace_id = error.headers.get("X-Trace-Id", "")
     except (URLError, TimeoutError, OSError):
-        return 0, {}
+        return (0, {}, "") if return_trace_id else (0, {})
     try:
         decoded = json.loads(payload)
-        return status, decoded if isinstance(decoded, dict) else {}
     except (json.JSONDecodeError, UnicodeDecodeError):
-        return status, {}
+        decoded = {}
+    result = (status, decoded if isinstance(decoded, dict) else {})
+    return result + (response_trace_id,) if return_trace_id else result
 
 
 def write_json(path, payload):
@@ -254,14 +261,15 @@ def prepare(target):
 
 
 def evaluate(target, state):
-    trace_id, parent_id = secrets.token_hex(16), secrets.token_hex(8)
     query = urlencode({"user_id": state["user_id"], "flag_name": state["flag_name"]})
-    status, result = target.request(
-        "evaluation-service", "/evaluate?" + query, traceparent=f"00-{trace_id}-{parent_id}-01",
+    status, result, trace_id = target.request(
+        "evaluation-service", "/evaluate?" + query, return_trace_id=True,
     )
     if status != 200 or result.get("result") is not True or result.get("flag_name") != state["flag_name"]:
         raise DemoError(f"A avaliação não retornou o resultado true esperado (HTTP {status}).")
-    state.update(evaluated=True, trace_id=trace_id, parent_span_id=parent_id, evaluated_at=timestamp())
+    if not re.fullmatch(r"[0-9a-fA-F]{32}", trace_id) or int(trace_id, 16) == 0:
+        raise DemoError("A avaliação não devolveu um X-Trace-Id válido; confira a instrumentação do evaluation-service.")
+    state.update(evaluated=True, trace_id=trace_id.lower(), parent_span_id="", evaluated_at=timestamp())
     write_json(target.state_file, state)
     return state
 
