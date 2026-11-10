@@ -2,7 +2,7 @@
 
 Aplicação, infraestrutura e CI da fase 4 do Tech Challenge FIAP. O GitOps fica no repositório irmão `../togglemaster-gitops`. Esta cópia preserva a entrega anterior e adiciona observabilidade e resposta automática a incidente.
 
-**Estado em 09/11/2026 (BRT): implementação, integração local, CI remoto e ingestão de traces no New Relic validados; NÃO LIBERADO PARA GRAVAÇÃO.** Faltam o ensaio no EKS, a conferência visual do detalhe APM/Service Map, PagerDuty, ChatOps e Self-Healing no cluster. A janela AWS de 72 horas ainda não iniciou. Pacote para Vinicius: 12/11. Entrega acadêmica: 15/11.
+**Estado em 09/11/2026 (BRT): implementação, integração local, CI remoto e ingestão de traces no New Relic validados; NÃO LIBERADO PARA GRAVAÇÃO.** Faltam o ensaio no EKS, as capturas finais, PagerDuty, ChatOps e Self-Healing no cluster. A janela AWS de 72 horas ainda não iniciou. Pacote para Vinicius: 12/11. Entrega acadêmica: 15/11.
 
 ## Executar a prova local
 
@@ -45,7 +45,7 @@ O responder é uma automação operacional; o ecossistema continua com cinco mic
 - Python: 36 testes dos três serviços, lint e gate Bandit.
 - Runbook: 15 testes de autenticação, deduplicação persistente, concorrência, resolução atrasada e rollout correto; build Docker local.
 - Stack Docker: health dos cinco serviços, avaliação `true`, evento DynamoDB, trace ligado dos cinco serviços com 17 spans e logs correlacionados no Loki. Prometheus recebeu métricas reais através do Collector.
-- New Relic: conta ativa e 17 spans dos cinco serviços consultados via NRQL, com raiz HTTP real e vínculo produtor/consumidor SQS, a partir do Docker local. A sessão Basic bloqueou detalhe/Service Map, cuja conferência depende de uma sessão Full, a confirmar com Vinicius. [Evidência e limites](docs/evidencias/NEW_RELIC_LOCAL.md).
+- New Relic: a conta própria `8718919`, região US, recebeu 17 spans com 17 IDs únicos dos cinco serviços, raiz única e cadeia SQS send → process → acknowledge confirmados por NRQL, com origem Docker/LocalStack. Marcelo Full platform abre o APM sem upgrade; franquias gratuitas de um Full e 100 GB confirmadas. O Service Map foi conferido com cinco nós e relações evaluation → analytics/targeting/flag e flag/targeting → auth. O waterfall também foi conferido: 17 spans, zero erros exibidos, 86,09 ms no trace e trecho assíncrono até analytics/DynamoDB/acknowledge visível. Capturas finais ainda não foram salvas. [Nova evidência](docs/evidencias/NEW_RELIC_CONTA_PROPRIA.md); [histórico da conta `8717927`](docs/evidencias/NEW_RELIC_LOCAL.md) preservado.
 - Falha local: `/validate` retornou 503 enquanto `/health` continuou 200; restart local de limpeza removeu a falha. **Esse teste não é a prova de Self-Healing no cluster.**
 - Terraform: fmt/validate e prévia da infraestrutura com 115 criações, zero alterações e zero exclusões. Nenhum apply.
 - Segurança: SCA dos seis serviços e seis imagens aprovadas no filtro CRITICAL com correção disponível do CI. Quatro imagens Python corrigidas e integração repetida após o rebuild. [Evidência do gate](docs/evidencias/SECURITY_LOCAL.md) e [smoke final](docs/evidencias/LOCAL_SMOKE.json).
@@ -58,7 +58,7 @@ O CI remoto da base anterior aprovou os seis pipelines de build/segurança, GitO
 
 Repositórios públicos: [aplicação/IaC/CI](https://github.com/Marcelo6arcia/tech-challenge-fase-4) e [GitOps](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4). A entrega anterior foi preservada.
 
-Antes de iniciar a janela AWS de 72 horas, concluir os acessos conforme [Contas acadêmicas a preparar](docs/HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar). O New Relic já está ativo, com ingestão local confirmada; falta conferir detalhe/Service Map em uma sessão Full, a confirmar com Vinicius. A tentativa de SUBMIT do PagerDuty retornou erro genérico, sem conta ativa confirmada. Restrição a e-mail gratuito é hipótese apoiada na documentação, não a causa comprovada desse erro. Benefício Students e acessos individuais continuam verificações separadas.
+Antes de iniciar a janela AWS de 72 horas, concluir os acessos conforme [Contas acadêmicas a preparar](docs/HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar). A conta própria `8718919` já tem região US, acesso Full e ingestão comprovados; o Service Map dos cinco serviços já foi conferido. O waterfall também foi conferido; as capturas finais ainda precisam ser salvas. A tentativa de SUBMIT do PagerDuty retornou erro genérico, sem conta ativa confirmada. Restrição a e-mail gratuito é hipótese apoiada na documentação, não a causa comprovada desse erro. Benefício Students e acessos individuais continuam verificações separadas.
 
 1. Configurar `GITOPS_REPO`, roles OIDC, bucket de state e CIDRs permitidos. A promoção usa `GITOPS_SSH_KEY`, exclusiva do GitOps. O ID do novo repositório está declarado no Terraform. `DEPLOY_ENABLED=false` mantém testes, segurança e build/scan ativos, sem publicação ou promoção; `INFRA_ENABLED=false` mantém somente a análise estática de IaC.
 2. Preencher arquivos locais de backend/tfvars a partir dos exemplos. Estados da fase 4 usam `togglemaster/fase4/infra.tfstate` e `togglemaster/fase4/platform.tfstate`.
