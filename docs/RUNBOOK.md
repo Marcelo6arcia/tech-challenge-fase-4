@@ -1,6 +1,6 @@
 # Runbook operacional — ToggleMaster fase 4
 
-> **NÃO LIBERADO PARA GRAVAÇÃO.** Estado em 09/11/2026: integração Docker local validada; EKS, APM comercial, PagerDuty, ChatOps e Self-Healing no cluster ainda precisam de prova. Os comandos de cluster abaixo são procedimentos para o ambiente acadêmico quando ele estiver provisionado e validado; não foram executados como parte da escrita deste documento.
+> **NÃO LIBERADO PARA GRAVAÇÃO.** Estado em 09/11/2026 (BRT): integração Docker, CI remoto e ingestão de traces no New Relic confirmados. EKS, detalhe APM/Service Map, PagerDuty, ChatOps e Self-Healing no cluster ainda precisam de prova; a janela AWS de 72 horas não iniciou. Os comandos de cluster abaixo são procedimentos para o ambiente acadêmico quando ele estiver provisionado e validado; não foram executados como parte da escrita deste documento.
 
 Escopo: diagnosticar observabilidade, alerta e automação da fase 4. Marcelo prepara e opera o ambiente; Vinicius recebe a sessão ensaiada para gravar, sem assumir implementação. Meta de passagem: 12/11/2026; entrega acadêmica: 15/11/2026.
 
@@ -120,11 +120,25 @@ Erros de conexão apontam para Service/DNS/rede; rejeição de configuração ap
 
 ## 5. Trace ou Service Map ausente no APM
 
-1. Confirmar que a conta New Relic e a chave de ingestão foram realmente preparadas. A existência de um Secret com nome correto não comprova validade da chave. Conferir também o benefício Students aplicado e o tipo do usuário que abrirá o APM: a conta Free comum inclui somente um usuário completo e Basic não acessa essa interface. Os passos e limites de cadastro estão no [handoff](HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar).
+Estado conhecido: a conta New Relic está ativa; a [execução Docker local](evidencias/NEW_RELIC_LOCAL.md) confirmou no SaaS 17 spans dos cinco serviços, raiz HTTP real e a relação produtor/consumidor SQS. O detalhe APM/Service Map foi bloqueado pela restrição Full na sessão Basic. Conferir essas telas em uma sessão Full, a confirmar com Vinicius, continua pendente.
+
+1. Usar a conta acadêmica existente e separar falha de ingestão de restrição de acesso à interface. Um Secret com nome correto não comprova validade da chave, e entidades listadas não comprovam o Service Map. Benefício Students e tipo/permissões do usuário são verificações distintas, descritas no [handoff](HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar).
 2. Conferir conta/região e endpoint configurados no exporter `otlphttp/newrelic`, sem exibir o header `api-key`. Endpoint atual do código: `https://otlp.nr-data.net:4318`; alinhar à região da conta antes de implantar.
 3. Observar logs do gateway: 401/403 sugerem autenticação/permissão; timeout pode indicar saída de rede/DNS. Não imprimir configurações resolvidas com credenciais.
-4. Fazer uma requisição nova com `demo.py trace`, localizar o ID atual no APM e usar janela de tempo coerente.
-5. Conferir `service.name` dos cinco serviços e spans HTTP client/server, produtor SQS, consumidor analytics e DynamoDB.
+4. Fazer uma requisição nova com `demo.py trace`, consultar o `trace.id` atual via NRQL e usar conta e janela de tempo coerentes. A primeira consulta pode retornar zero antes de os dados ficarem pesquisáveis. No teste registrado, os spans apareceram após aproximadamente quatro minutos; isso não estabelece SLA nem prazo geral de indexação.
+5. Se o exporter reportar envio, mas os spans continuarem ausentes, consultar `NrIntegrationError` no mesmo intervalo. A validação assíncrona pode detectar problemas depois de uma resposta de sucesso do endpoint OTLP. [Troubleshooting oficial do New Relic](https://docs.newrelic.com/docs/opentelemetry/best-practices/opentelemetry-otlp-troubleshooting/).
+6. Conferir `service.name` dos cinco serviços, spans HTTP client/server, produtor SQS, consumidor analytics e DynamoDB. Verificar `id`/`parent.id` e exatamente um span raiz sem pai; a execução de referência confirmou essa estrutura no SaaS. Repetir a verificação para o trace do ensaio no EKS.
+
+Consulta de diagnóstico, na conta acadêmica, ajustando o intervalo ao teste:
+
+```sql
+FROM NrIntegrationError
+SELECT timestamp, message, newRelicFeature
+SINCE 1 hour ago
+LIMIT 100
+```
+
+Essa consulta é um procedimento, não um resultado já executado nesta evidência. Correlacionar os eventos pelo horário e origem; não atribuir qualquer erro da conta automaticamente ao trace do teste. Revisar o conteúdo antes de capturar a tela. Contadores de envio e fila vazia do Collector ajudam no diagnóstico, mas a consulta dos spans no destino é a confirmação da ingestão.
 
 Se evaluation aparecer sozinho, verificar cache e instrumentação dos clientes. Se analytics faltar, verificar recebimento da fila e os atributos W3C `traceparent`/`tracestate` como MessageAttributes String, extraídos pelo consumidor. O produtor mantém o contexto após encerrar a resposta HTTP. Se o trace estiver completo e o mapa ainda incompleto, investigar suporte/agrupamento do APM; não criar dependência falsa nem substituir APM comercial por visualização local.
 
@@ -169,6 +183,8 @@ python3 scripts/demo.py fault --mode cluster \
 `fault` exige `DEMO_FAULT_ENABLED=true` e autenticação master, lida pelo script. Ativa apenas a memória do processo que recebeu a chamada; com duas réplicas, parte das respostas pode continuar 200. `/health` fica saudável para que a liveness não substitua o runbook. Manter a carga durante a janela e a recuperação. Se o comando retorna 404, conferir habilitação/rota; 403 aponta para autenticação. Não revelar a chave para diagnosticar.
 
 ## 8. Firing sem PagerDuty ou ChatOps
+
+Pendência atual: o SUBMIT do cadastro PagerDuty retornou erro genérico, sem conta ativa confirmada. A restrição a e-mail gratuito é hipótese apoiada na documentação, não diagnóstico fechado; seguir a conferência de acesso/suporte descrita no [handoff](HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar) antes do ensaio integrado.
 
 Verificar no Grafana o contact point `togglemaster-incident`, os três receivers e a política de notificação. Confirmar na interface o resultado da entrega e, nas ferramentas externas, conta, serviço de incidente e canal acadêmico corretos. A integração deve estar configurada com credenciais acadêmicas, não de outros projetos.
 

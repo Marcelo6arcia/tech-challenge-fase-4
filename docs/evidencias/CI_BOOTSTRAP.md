@@ -2,7 +2,17 @@
 
 Os dois repositórios estão públicos: [aplicação/IaC](https://github.com/Marcelo6arcia/tech-challenge-fase-4) e [GitOps](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4). A entrega anterior permaneceu intacta. Arquivos pessoais, configurações reais, planos brutos, state e chaves privadas não fazem parte dos commits.
 
-## Resultado atual
+## Correção da raiz do trace — resultado mais recente
+
+Commit `7c399ced7032dc7adfa62a78c28024a7db1e20f4`, publicado em 09/11/2026 (BRT):
+
+- **Evaluation aprovado:** [42736310727](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42736310727). Cinco jobs de qualidade passaram: build/testes, lint, SAST, SCA e build/scan da imagem com SBOM. OIDC, ECR, push e promoção GitOps ficaram desabilitados/ignorados.
+- **Integração aprovada:** [42736311082](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42736311082). Seis testes de descoberta/integridade do trace, smoke dos cinco serviços, 15 testes do runbook e encerramento da stack passaram.
+- Artefato `validacao-local-fase4` (ID `13727740829`) conferido: `passed=true`, trace `af46f010cae33e24349703b62bd2af6f`, 17 spans, cinco serviços, `evaluation_server_is_root=true` e `analytics_consumer_parent_is_producer=true`. Execução 10/11/2026, 01:33:00–01:33:09 UTC (09/11, 22:33 BRT).
+
+Este CI valida Docker no runner e não envia ao New Relic. A [prova de ingestão no SaaS](NEW_RELIC_LOCAL.md) usa outro trace, gerado no ambiente local. Nenhum gate foi removido; nenhuma nova tentativa foi necessária nestas duas execuções. A implantação AWS permanece pendente e a janela de 72 horas não iniciou.
+
+## Validação da base inicial
 
 - **GitOps aprovado:** [42674394167](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4/actions/runs/42674394167), commit `f5171a6`.
 - **Integração aprovada:** [42674019431](https://github.com/Marcelo6arcia/tech-challenge-fase-4/actions/runs/42674019431), commit `574b58f`. Health, avaliação, DynamoDB local, trace ligado nos cinco serviços, logs OTLP/Loki e métricas Prometheus passaram; 15 testes do runbook passaram. Trace de referência `188fffc540ddb681c5b0d3fe239b14a2`. É prova Docker no runner, não APM/EKS.

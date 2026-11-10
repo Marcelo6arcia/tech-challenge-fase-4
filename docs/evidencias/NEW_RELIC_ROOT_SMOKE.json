@@ -1,0 +1,79 @@
+{
+  "started_at": "2026-11-10T01:24:19.529303+00:00",
+  "mode": "local",
+  "checks": {
+    "health": {
+      "auth-service": 200,
+      "flag-service": 200,
+      "targeting-service": 200,
+      "evaluation-service": 200,
+      "analytics-service": 200
+    },
+    "evaluation": {
+      "http_status": 200,
+      "result": true
+    },
+    "dynamodb": {
+      "table": "analytics-events",
+      "matching_events": 1,
+      "result": true,
+      "event_ids": [
+        "e62217d2-381a-405d-b554-de0e13240d04"
+      ]
+    },
+    "trace": {
+      "trace_id": "b583e7e34a2f89e565f324a612133305",
+      "services": [
+        "analytics-service",
+        "auth-service",
+        "evaluation-service",
+        "flag-service",
+        "targeting-service"
+      ],
+      "span_count": 17,
+      "evaluation_server_span_id": "74dd305db042ffe3",
+      "evaluation_server_is_root": true,
+      "analytics_consumer_parent_is_producer": true
+    },
+    "otlp_logs": {
+      "trace_id": "b583e7e34a2f89e565f324a612133305",
+      "services": [
+        "analytics-service",
+        "auth-service",
+        "evaluation-service",
+        "flag-service",
+        "targeting-service"
+      ]
+    },
+    "prometheus": {
+      "http_requests": {
+        "auth-service": 5.0,
+        "flag-service": 3.0,
+        "targeting-service": 3.0,
+        "evaluation-service": 2.0,
+        "analytics-service": 1.0
+      },
+      "analytics_processed": 1.0,
+      "note": "Contadores incluem /health; o dashboard separa tráfego de negócio."
+    },
+    "loki": {
+      "trace_id": "b583e7e34a2f89e565f324a612133305",
+      "services": [
+        "analytics-service",
+        "auth-service",
+        "evaluation-service",
+        "flag-service",
+        "targeting-service"
+      ],
+      "matching_lines": 9
+    }
+  },
+  "passed": true,
+  "scope": "Stack Docker local; não comprova APM comercial, Kubernetes ou incidente externo.",
+  "run_id": "20261110T012419-2948dca6",
+  "flag_name": "fiap4-20261110T012419-2948dca6",
+  "user_id": "fiap4-demo-23f7dbef",
+  "trace_id": "b583e7e34a2f89e565f324a612133305",
+  "parent_span_id": "",
+  "finished_at": "2026-11-10T01:24:21.963965+00:00"
+}
