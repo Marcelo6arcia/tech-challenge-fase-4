@@ -4,6 +4,8 @@ Consulta em **09/11/2026**, região **us-east-1 (N. Virginia)**, valores em **US
 
 **Base estimada: US$ 7,75/dia para a infraestrutura planejada; US$ 8,59/dia incluindo a plataforma prevista. Para 72 horas: US$ 23,26 e US$ 25,78, respectivamente.** Esses valores são subtotais de capacidade, não um teto de cobrança: consumo variável e serviços externos estão separados abaixo.
 
+**Revisão em 10/11/2026:** novo plano de infra com **115 criações, zero alterações e zero exclusões**, EKS **1.37** em suporte padrão e o mesmo dimensionamento da tabela. Os SKUs do catálogo e as tarifas EKS/IPv4 foram reconferidos. A cota regional é de 16 vCPUs On-Demand, com 2 em uso no momento da consulta e 6 necessários para os três nós iniciais. A camada platform passou na validação estática. Seu plano executável requer a infra e o EKS. A janela de 72 horas continua sem início.
+
 ## Escopo verificado
 
 O plano salvo em `.runs/infra.tfplan` contém **115 criações, nenhuma alteração e nenhuma destruição**, no novo estado da fase 4. Foram extraídos em memória somente tipos, quantidades e tamanhos necessários ao cálculo; o JSON completo do plano não foi salvo neste documento.

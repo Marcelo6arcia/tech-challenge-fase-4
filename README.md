@@ -2,7 +2,7 @@
 
 Aplicação, infraestrutura e CI da fase 4 do Tech Challenge FIAP. O GitOps fica no repositório irmão `../togglemaster-gitops`. Esta cópia preserva a entrega anterior e adiciona observabilidade e resposta automática a incidente.
 
-**Estado em 10/11/2026 (BRT): implementação, integração local, CI remoto, traces no New Relic e notificações reais Firing/Resolved no Discord validados; NÃO LIBERADO PARA GRAVAÇÃO.** A prova de ChatOps partiu do Grafana local e teve recuperação manual. Faltam PagerDuty, o ensaio integrado no EKS com Self-Healing e as capturas finais. Nenhum apply AWS ocorreu; a janela de 72 horas ainda não iniciou. Pacote para Vinicius: 12/11. Entrega acadêmica: 15/11.
+**Estado em 10/11/2026 (BRT): NÃO LIBERADO PARA GRAVAÇÃO.** Traces no New Relic e entregas do Grafana ao Jira Service Management e ao Discord foram verificados em ensaios locais. No [ensaio local do Jira](docs/evidencias/JSM_LOCAL.md), o incidente FIAP4-2 abriu e chegou a `Completed` automaticamente após a recuperação manual do serviço. Faltam aceite acadêmico do JSM, integração no EKS, ensaio com Self-Healing e capturas finais. A janela AWS de 72 horas ainda não iniciou. Pacote para Vinicius: 12/11. Entrega acadêmica: 15/11.
 
 ## Executar a prova local
 
@@ -59,11 +59,13 @@ O CI remoto da base anterior aprovou os seis pipelines de build/segurança, GitO
 
 Repositórios públicos: [aplicação/IaC/CI](https://github.com/Marcelo6arcia/tech-challenge-fase-4) e [GitOps](https://github.com/Marcelo6arcia/togglemaster-gitops-fase-4). A entrega anterior foi preservada.
 
-Antes de iniciar a janela AWS de 72 horas, concluir os acessos conforme [Contas acadêmicas a preparar](docs/HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar). A conta própria `8718919` já tem região US, acesso Full e ingestão comprovados; o Service Map dos cinco serviços e o waterfall já foram conferidos. O Discord acadêmico recebeu Firing e Resolved no ensaio local; as capturas finais ainda precisam ser salvas. A tentativa de SUBMIT do PagerDuty retornou erro genérico, sem conta ativa confirmada. O suporte confirmou o recebimento no caso `00867289`, ainda sem análise humana ou liberação. Restrição a e-mail gratuito é hipótese apoiada na documentação, não a causa comprovada desse erro. Benefício Students e acessos individuais continuam verificações separadas.
+Antes de iniciar a janela AWS de 72 horas, concluir os acessos conforme [Contas acadêmicas a preparar](docs/HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar). O JSM Free tem integração Grafana e Automation FIAP4 ativas. A abertura e a conclusão do incidente estão documentadas no [ensaio local do Jira](docs/evidencias/JSM_LOCAL.md). PagerDuty permanece como histórico de cadastro sem conta ativa confirmada. Benefício Students e acessos individuais continuam verificações separadas.
+
+**Gate JSM antes do EKS:** a cópia local do GitOps já liga o overlay ao Grafana e às propriedades do ExternalSecret. Publicar a revisão, preparar a entrada privada e gravar os valores no Secrets Manager após o apply de infra. O [gate operacional](docs/RUNBOOK.md#gate-jsm-antes-do-eks) detalha a sequência. O enunciado nomeia PagerDuty ou Opsgenie, então o aceite acadêmico do JSM continua pendente.
 
 1. Configurar `GITOPS_REPO`, roles OIDC, bucket de state e CIDRs permitidos. A promoção usa `GITOPS_SSH_KEY`, exclusiva do GitOps. O ID do novo repositório está declarado no Terraform. `DEPLOY_ENABLED=false` mantém testes, segurança e build/scan ativos, sem publicação ou promoção; `INFRA_ENABLED=false` mantém somente a análise estática de IaC.
-2. Preencher arquivos locais de backend/tfvars a partir dos exemplos. Estados da fase 4 usam `togglemaster/fase4/infra.tfstate` e `togglemaster/fase4/platform.tfstate`.
-3. Gerar e revisar o plano da infraestrutura antes de aplicar:
+2. Conferir os backends e tfvars locais da fase 4 e concluir o staging privado. Os estados usam `togglemaster/fase4/infra.tfstate` e `togglemaster/fase4/platform.tfstate`.
+3. Gerar e revisar o plano da infraestrutura. Registrar início e fim em UTC no começo do primeiro apply e definir `CLOUD_EXPIRES_AT` para a janela de até 72 horas:
 
 ```bash
 export FIAP_ACCOUNT_ID='ID-DA-CONTA-ACADEMICA'
@@ -72,10 +74,10 @@ export FIAP_ACCOUNT_ID='ID-DA-CONTA-ACADEMICA'
 ./scripts/bootstrap.sh apply infra
 ```
 
-4. Depois do cluster, configurar o contexto explícito `togglemaster-fase4`, preparar a camada platform e repetir `plan platform`/`apply platform`. A camada platform depende dos outputs reais da infraestrutura.
+4. Depois da infra, configurar o contexto explícito `togglemaster-fase4` e carregar os valores acadêmicos no Secrets Manager. Gerar e revisar `plan platform` antes de `apply platform`. A camada platform depende dos outputs da infraestrutura e do acesso ao EKS.
 5. Publicar imagens pelos gates do CI; o ArgoCD aplica o GitOps. Nunca promover `SET_BY_CI` como imagem válida.
-6. Preencher os valores das integrações pelo Secrets Manager, fora do Git: New Relic, PagerDuty e Discord. Validar o fluxo real antes de liberar a gravação.
-7. Ao iniciar a janela autorizada de até 72 horas, registrar início/fim UTC e definir `CLOUD_EXPIRES_AT` no CI. Habilitar publicação somente após recursos e secrets disponíveis. A trava impede novas operações após a expiração; **não desliga recursos**. Planejar o encerramento com antecedência, conforme o runbook.
+6. Conferir os valores das integrações no Secrets Manager e a sincronização dos ExternalSecrets, conforme o gate JSM. Validar o fluxo real antes de liberar a gravação.
+7. Reservar as últimas três horas para encerrar a infraestrutura e conferir recursos remanescentes. `CLOUD_EXPIRES_AT` trava novas operações do CI após a expiração. O desligamento segue o procedimento do runbook.
 
 O pipeline Terraform publica apenas resumo de tipos/ações. O plano completo passa entre jobs criptografado com `TF_PLAN_KEY`; apply exige dispatch explícito e revisão no environment `aws-dev`. O bootstrap inicial local é necessário para criar as roles OIDC.
 

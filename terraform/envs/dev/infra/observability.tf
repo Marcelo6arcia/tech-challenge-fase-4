@@ -1,5 +1,5 @@
 # Fase 4: armazenamento persistente e referências de segredos da observabilidade.
-# Valores de APM/PagerDuty/Discord são cadastrados no Secrets Manager pelo operador;
+# Valores de APM, Jira e Discord são cadastrados no Secrets Manager pelo operador;
 # não entram em tfvars, Git ou outputs. Este arquivo não provisiona nada sem apply.
 resource "aws_secretsmanager_secret" "observability_apm" {
   name                    = "${local.secret_prefix}/observability/apm"
@@ -10,7 +10,7 @@ resource "aws_secretsmanager_secret" "observability_apm" {
 
 resource "aws_secretsmanager_secret" "observability_incidents" {
   name                    = "${local.secret_prefix}/observability/incidents"
-  description             = "RESPONDER_TOKEN, PAGERDUTY_INTEGRATION_KEY e DISCORD_WEBHOOK_URL"
+  description             = "Credenciais do responder, Discord, JSM Operations e Jira Automation"
   recovery_window_in_days = 7
   tags                    = local.common_tags
 }

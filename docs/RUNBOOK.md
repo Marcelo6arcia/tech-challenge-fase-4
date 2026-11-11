@@ -1,8 +1,46 @@
 # Runbook operacional — ToggleMaster fase 4
 
-> **NÃO LIBERADO PARA GRAVAÇÃO.** Estado em 10/11/2026 (BRT): integração Docker, CI remoto, traces no New Relic e mensagens reais Firing/Resolved no Discord confirmados. A prova de ChatOps partiu do Grafana local e teve recuperação manual. PagerDuty, o ensaio integrado no EKS com Self-Healing e as capturas finais continuam pendentes. Nenhum apply AWS ocorreu; a janela de 72 horas não iniciou. Os comandos de cluster abaixo são procedimentos para o ambiente acadêmico quando ele estiver provisionado e validado; não foram executados como parte da escrita deste documento.
+> **NÃO LIBERADO PARA GRAVAÇÃO.** O [ensaio local do Jira](evidencias/JSM_LOCAL.md) de 10/11/2026 confirmou abertura e conclusão automáticas de FIAP4-2, alerta Operations e notificações Discord. A recuperação foi manual. Faltam publicação do GitOps, valores no Secrets Manager e ensaio EKS com Self-Healing, capturas finais e aceite acadêmico do JSM. A janela AWS de 72 horas ainda não iniciou.
 
 Escopo: diagnosticar observabilidade, alerta e automação da fase 4. Marcelo prepara e opera o ambiente; Vinicius recebe a sessão ensaiada para gravar, sem assumir implementação. Meta de passagem: 12/11/2026; entrega acadêmica: 15/11/2026.
+
+## Gate JSM antes do EKS
+
+O JSM Free está criado, com integração Grafana e Automation FIAP4 ativas. O [ensaio local do Jira](evidencias/JSM_LOCAL.md) confirma o caminho `Open → Completed` no workflow de incidentes. O PDF do professor, páginas 5–6, nomeia PagerDuty ou Opsgenie. Registrar o aceite para JSM antes de declarar o requisito atendido.
+
+A Application Grafana já carrega o overlay JSM depois dos valores base na cópia local. O ExternalSecret usa o mesmo segredo AWS de incidentes, com as propriedades de Jira, Discord e responder. Helm e Kustomize verificam as referências declaradas. A publicação e a sincronização no EKS estão pendentes.
+
+Antes de provisionar a demonstração no EKS:
+
+1. Consultar o [ensaio local do Jira](evidencias/JSM_LOCAL.md) para abertura e resolução já verificadas. Ensaiar reenvios do mesmo episódio para verificar deduplicação. Validar a mitigação automática no EKS.
+2. Preparar as credenciais com o procedimento abaixo antes de iniciar a janela. Depois do apply de infra, cadastrar os dois JSONs no Secrets Manager antes de sincronizar as aplicações.
+3. Publicar e conferir a revisão da Application e do ExternalSecret. A validação renderiza a Application com os quatro receivers, as referências do Secrets Manager e o responder interno.
+4. Após a implantação, conferir sincronização dos ExternalSecrets e variáveis do Grafana sem exibir seus valores. Repetir no EKS o alerta real, a abertura/resolução do incidente e o Self-Healing. Registrar os commits e o resultado antes de liberar Vinicius.
+
+A [integração Grafana/JSM](https://support.atlassian.com/jira-service-management-cloud/docs/integrate-with-grafana/) cria e fecha **alertas**; isso não demonstra um incidente resolvido. A rota FIAP4 usa [Incoming webhook da Automation](https://support.atlassian.com/cloud-automation/docs/configure-the-incoming-webhook-trigger-in-atlassian-automation/) com `POST`, JSON e header `X-Automation-Webhook-Token`. Não depende de `Alert created` ou Sync nativo, nem exige ativar um trial para testar esta configuração. A disponibilidade efetiva das ações e a quota da conta devem ser conferidas; não tratar a preparação como prova de funcionamento.
+
+### Entrada privada e sincronização
+
+1. No Terminal, na raiz da aplicação, executar `python3 scripts/stage-observability.py`. Os cinco prompts ocultos pedem webhook Discord, API key JSM, URL e token da regra FIAP4 e licença New Relic. A URL oficial do Operations já está no script, que também gera um token exclusivo para o responder. O staging grava dois JSONs ignorados pelo Git em `.runs/eks-observability/` com modo 0600, sem enviar dados. Se o token Jira não estiver guardado, preparar uma nova credencial para a mesma regra e usar o valor exibido no editor antes de salvar. A rotação substitui o token anterior.
+2. Depois do apply de infra revisado e antes da sincronização, confirmar conta, região e nomes pela saída `observability_secret_names`. Carregar os dois JSONs com o perfil acadêmico. Executar em shell dedicado com `FIAP_ACCOUNT_ID` definido para a conta conferida:
+
+```bash
+(
+  set -euo pipefail
+  : "${FIAP_ACCOUNT_ID:?Defina a conta acadêmica esperada}"
+  unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+  actual="$(aws --profile fiap --region us-east-1 sts get-caller-identity --query Account --output text)"
+  test "$actual" = "$FIAP_ACCOUNT_ID"
+  aws --profile fiap --region us-east-1 secretsmanager put-secret-value \
+    --secret-id togglemaster/dev/observability/incidents \
+    --secret-string file://.runs/eks-observability/incidents.json --query VersionId --output text
+  aws --profile fiap --region us-east-1 secretsmanager put-secret-value \
+    --secret-id togglemaster/dev/observability/apm \
+    --secret-string file://.runs/eks-observability/apm.json --query VersionId --output text
+)
+```
+
+3. Confirmar sucesso de ambos os uploads e remover os dois arquivos temporários. Validar `Ready` dos ExternalSecrets e os pods por nome e estado. Evitar abrir ou exportar a configuração resolvida do Grafana, pois o token do webhook fica no header da integração.
 
 ## 1. Identificar o ambiente antes de operar
 
@@ -23,7 +61,7 @@ AWS_PROFILE=fiap AWS_DEFAULT_PROFILE=fiap \
 
 Resultados esperados: identidade acadêmica correta, nós prontos, pods/volumes da stack disponíveis e aplicações ArgoCD coerentes com os commits pretendidos. Ausência de cluster não é falha do Collector: concluir o provisionamento por IaC primeiro, após plano revisado. Este runbook não autoriza um apply nem contém um comando de criação de infraestrutura.
 
-Na consulta feita pela sessão em 09/11, não havia EKS/RDS/ECR e o bucket de backend existia. A prévia de infraestrutura produziu 115 criações, zero alterações e zero exclusões; nenhum apply ocorreu. Conferir novamente e atualizar o plano antes de qualquer mudança.
+A revisão de 10/11 confirmou o perfil acadêmico em us-east-1 e o CIDR /32 atual do EKS. O plano de infra contém 115 criações, zero alterações e zero exclusões. A camada platform passou na validação estática. Seu plano executável depende dos outputs da infra e do acesso ao EKS. Conferir a identidade e refazer a revisão antes do apply.
 
 ## 2. Acesso às telas por port-forward
 
@@ -164,7 +202,7 @@ Regra declarada: `AuthHigh5xx`, serviço `auth-service`, namespace `togglemaster
 
 1. Confirmar que a regra não está pausada e datasource está saudável. `NoData`/`Error` não são a prova do incidente desejado.
 2. Iniciar `load` e observar respostas antes de ativar a falha.
-3. Ativar `fault` somente quando PagerDuty, ChatOps e runbook estiverem configurados e o cenário autorizado para ensaio.
+3. Ativar `fault` somente após o gate JSM, com Operations, Automation FIAP4, ChatOps e runbook configurados e o cenário autorizado para ensaio.
 
 ```bash
 python3 scripts/demo.py load --mode cluster \
@@ -182,15 +220,17 @@ python3 scripts/demo.py fault --mode cluster \
 
 `fault` exige `DEMO_FAULT_ENABLED=true` e autenticação master, lida pelo script. Ativa apenas a memória do processo que recebeu a chamada; com duas réplicas, parte das respostas pode continuar 200. `/health` fica saudável para que a liveness não substitua o runbook. Manter a carga durante a janela e a recuperação. Se o comando retorna 404, conferir habilitação/rota; 403 aponta para autenticação. Não revelar a chave para diagnosticar.
 
-## 8. Firing sem PagerDuty ou ChatOps
+## 8. Firing sem incidente JSM ou ChatOps
 
 Estado confirmado: no [ensaio Docker local de 10/11](evidencias/DISCORD_LOCAL.md), Grafana 12.3.1 enviou Firing e Resolved do alerta real `AuthHigh5xx` ao Discord. As mensagens compartilham fingerprint `ce3ccb76701c998b` e início 15:55:40 UTC; a resolução registra fim 15:57:20 UTC (12:55:40–12:57:20 BRT). Dez amostras de `/validate` retornaram 200 antes, 503 durante e 200 após o restart **manual** de auth; Grafana terminou `inactive`/`health ok`. Apenas Discord estava habilitado, sem PagerDuty ou responder. As mensagens foram conferidas na interface, sem captura de imagem salva. Essa prova não substitui o ensaio EKS com mitigação automática.
 
-Pendência atual: o SUBMIT do cadastro PagerDuty retornou erro genérico, sem conta ativa confirmada. A restrição a e-mail gratuito é hipótese apoiada na documentação, não diagnóstico fechado; a solicitação de diagnóstico/liberação foi enviada ao suporte oficial em 09/11/2026 (BRT), após autorização. O suporte confirmou recebimento no caso `00867289`, ainda sem análise humana ou liberação. Aguardar orientação, sem reenviar a solicitação, conforme o [handoff](HANDOFF_VINICIUS.md#contas-acadêmicas-a-preparar) antes do ensaio integrado.
+O [ensaio local do Jira](evidencias/JSM_LOCAL.md) mostrou que `Resolved` é o evento do Grafana e `Completed` é o destino do workflow FIAP4. Em caso de falha na transição, conferir o audit log e o status no próprio incidente. PagerDuty permanece no histórico do caso `00867289`.
 
-Verificar no Grafana o contact point `togglemaster-incident`, os três receivers e a política de notificação. Confirmar na interface o resultado da entrega e, nas ferramentas externas, conta, serviço de incidente e canal acadêmico corretos. A integração deve estar configurada com credenciais acadêmicas, não de outros projetos.
+Conferir se a revisão sincronizada carrega o overlay JSM e o ExternalSecret correspondente. Depois de concluir o [gate JSM](#gate-jsm-antes-do-eks), verificar o contact point `togglemaster-incident`, os quatro receivers e a política. Conferir separadamente: alerta na equipe Operations correta, execução da Automation, incidente FIAP4 com request type de incidente e label do episódio, mensagem no canal acadêmico e execução do responder. Usar somente credenciais do projeto.
 
-O webhook do runbook é um receiver separado das notificações PagerDuty/Discord. Os três recebem o mesmo grupo de alerta em paralelo, com `group_wait: 0s` depois de a regra entrar em Firing; não há garantia de ordem entre entrega externa e mitigação. A resolução pode aguardar o `group_interval: 30s`. A entrega para um receiver não comprova a entrega para os demais. Teste de contact point pode validar conectividade, mas não substitui a prova de alerta real abrindo incidente e acionando a mitigação. Após corrigir, repetir o ensaio completo com um novo episódio, respeitando cooldown e o estado do alerta.
+Na Automation, conferir regra habilitada para o ensaio, auditoria, permissões do ator, lookup de deduplicação e transição de resolução. Um HTTP 200 do incoming webhook não prova que a regra executou: o endpoint também pode responder 200 com segredo incorreto ou regra inexistente. Confirmar o audit log e o incidente criado/atualizado, conforme o [diagnóstico oficial](https://support.atlassian.com/automation/kb/check-if-the-incoming-webhook-trigger-in-an-automation-rule-is-correct/). Testar firing repetido, resolved repetido e resolução atrasada de outro episódio. Lookup seguido de criação não é uma operação atômica; não prometer deduplicação absoluta sob concorrência.
+
+O webhook do runbook é separado dos destinos Operations/Automation/Discord. Os quatro receivers recebem o mesmo grupo de alerta em paralelo, com `group_wait: 0s` depois de Firing; não há garantia de ordem entre entrega externa e mitigação. A resolução pode aguardar `group_interval: 30s`. Fechar o alerta Operations não comprova resolver o incidente FIAP4; verificar ambos. Teste de contact point pode validar conectividade, mas não substitui a prova de alerta real abrindo incidente e acionando a mitigação. Após corrigir, repetir o ensaio completo com um novo episódio, respeitando cooldown e o estado do alerta.
 
 ## 9. Webhook ou Self-Healing não executa
 
